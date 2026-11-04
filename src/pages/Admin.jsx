@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api.js'
+import { useFeedback } from '../context/FeedbackContext.jsx'
 
 const tabs = ['Overview', 'Drivers', 'Students', 'Rides']
 const dateLabel = (value) => value ? new Date(value).toLocaleString() : '—'
@@ -10,6 +11,7 @@ function Stat({ label, value, hint }) {
 }
 
 export default function Admin() {
+  const notify = useFeedback()
   const [admin, setAdmin] = useState(null)
   const [checking, setChecking] = useState(true)
   const [email, setEmail] = useState('')
@@ -78,12 +80,15 @@ export default function Admin() {
     setError('')
     setNotice('')
     setLoading(true)
+    notify('Signing in to the admin dashboard…', 'loading', 0)
     try {
       const result = await api.adminLogin({ email, password })
       localStorage.setItem('cuetgo_admin_token', result.token)
       setAdmin(result.admin)
+      notify('Admin sign-in successful.', 'success')
       setPassword('')
     } catch (e) {
+      notify(e.message, 'error')
       setError(e.message)
     } finally {
       setLoading(false)
@@ -94,8 +99,11 @@ export default function Admin() {
     setBusyId(id)
     setError('')
     setNotice('')
+    const actionLabel = status === 'approved' ? 'Approving driver…' : status === 'rejected' ? 'Rejecting driver…' : 'Updating driver status…'
+    notify(actionLabel, 'loading', 0)
     try {
       await api.adminSetDriverStatus(id, status)
+      notify(`Driver application ${status} successfully.`, 'success')
       setNotice(`Driver application ${status} successfully.`)
       await loadDashboard()
     } catch (e) {
@@ -110,8 +118,10 @@ export default function Admin() {
     setBusyId(id)
     setError('')
     setNotice('')
+    notify('Cancelling ride…', 'loading', 0)
     try {
       await api.adminCancelRide(id)
+      notify('Ride cancelled successfully.', 'success')
       setNotice('Ride cancelled.')
       await loadDashboard()
     } catch (e) {
@@ -145,7 +155,7 @@ export default function Admin() {
   return <div className="admin-page">
     <header className="admin-header">
       <div><div className="admin-brand"><span className="admin-mark-small">C</span> CUET<span>Go</span> <b>ADMIN</b></div><p>Platform control centre</p></div>
-      <div className="admin-header-actions"><span>{admin.email}</span><button onClick={loadDashboard} disabled={loading}>↻ Refresh</button><button onClick={logout}>Sign out</button></div>
+      <div className="admin-header-actions"><span>{admin.email}</span><button onClick={() => { notify('Refreshing dashboard…', 'loading', 0); loadDashboard().then(() => notify('Dashboard updated.', 'success')) }} disabled={loading}>↻ Refresh</button><button onClick={() => { notify('Signing out…', 'loading', 0); window.setTimeout(logout, 500) }}>Sign out</button></div>
     </header>
     <main className="admin-main">
       <div className="admin-welcome"><div><span className="admin-eyebrow">ADMINISTRATION</span><h1>Dashboard</h1><p>Review registrations and monitor campus ride activity.</p></div><span className="admin-secure">🔒 Secure admin session</span></div>
