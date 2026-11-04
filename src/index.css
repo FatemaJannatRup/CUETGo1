@@ -186,3 +186,103 @@ html, body { min-height: 100%; }
   .auth-page { padding:24px 22px; }
   .auth-heading { margin-top:28px; }
 }
+
+
+
+/* CUETGo unified product design */
+:root {
+  --ink:#102f45;
+  --muted:#6d8494;
+  --sky-50:#f3faff;
+  --sky-100:#e8f4fb;
+  --sky-200:#d5eaf5;
+  --sky-400:#72b5dc;
+  --sky-500:#3189b8;
+  --sky-600:#226f9b;
+  --sky-700:#1d5478;
+  --cream:#f4f8fa;
+}
+body { background:#edf4f8; color:var(--ink); }
+.phone-shell { background:radial-gradient(ellipse at 10% 5%,rgba(70,151,194,.15),transparent 34%),radial-gradient(ellipse at 90% 95%,rgba(39,104,145,.10),transparent 36%),#edf4f8; }
+.phone-screen { max-width:520px; min-height:min(920px,94vh); height:min(920px,94vh); background:#f7fafc; border:1px solid rgba(35,78,110,.10); border-radius:28px; box-shadow:0 28px 80px rgba(20,53,78,.15); }
+.screen-scroll { background:#f6fafc; }
+.app-dashboard { background:#f4f8fa!important; color:#102f45; font-family:Inter,"Segoe UI",Arial,sans-serif; }
+.app-header { position:relative; padding:30px 26px 24px!important; color:#fff!important; border-radius:0 0 27px 27px!important; background:linear-gradient(135deg,#245d7d 0%,#2e86ae 58%,#68b2d0 100%)!important; box-shadow:0 14px 30px rgba(37,104,140,.16)!important; }
+.app-header p { color:rgba(255,255,255,.76)!important; }
+.app-header h1 { color:#fff!important; font-size:25px; letter-spacing:-.5px; }
+.app-header button { padding:9px 14px; border:1px solid rgba(255,255,255,.34); border-radius:999px; background:rgba(255,255,255,.13); color:#fff!important; text-decoration:none!important; font-size:12px; }
+.app-header .metric-pill { color:#185879; background:rgba(255,255,255,.88); border-color:rgba(255,255,255,.6); }
+.app-header > div > div:last-child { border-radius:17px!important; background:rgba(255,255,255,.15)!important; border:1px solid rgba(255,255,255,.24)!important; }
+.app-main { padding:22px 22px 30px!important; }
+.app-tabs { padding:5px; border-radius:15px; background:#eaf2f6; gap:5px!important; }
+.app-tabs button { min-height:40px; border-radius:11px!important; border:0!important; background:transparent!important; color:#678091!important; font-size:10px!important; letter-spacing:.08em!important; transition:all .18s ease; }
+.app-tabs button[class*="bg-sky-500"] { background:#fff!important; color:#1f6f99!important; box-shadow:0 3px 12px rgba(30,85,117,.10)!important; }
+.app-card { padding:19px!important; border:1px solid #e1ebf0!important; border-radius:19px!important; background:#fff!important; box-shadow:0 8px 26px rgba(26,70,96,.045)!important; }
+.app-card h2,.app-card h3 { color:#163a52; letter-spacing:-.25px; }
+.app-dashboard input:not([type="checkbox"]),.app-dashboard select,.app-dashboard textarea {
+  min-height:45px; border:1px solid #dce8ee!important; border-radius:12px!important; background:#f8fbfc!important; color:#17394e!important; padding:10px 12px; font-size:13px; outline:none; transition:border-color .18s,box-shadow .18s;
+}
+.app-dashboard input:focus,.app-dashboard select:focus,.app-dashboard textarea:focus { border-color:#69a9c8!important; box-shadow:0 0 0 3px rgba(75,147,183,.12); background:#fff!important; }
+.app-dashboard label { color:#527083!important; font-size:10px!important; letter-spacing:.09em; font-weight:800!important; }
+.app-dashboard .rounded-2xl.border.border-sky-100,
+.app-dashboard .rounded-2xl.border.border-sky-200 { border-color:#e1edf2!important; background:#f5fafc!important; }
+.app-dashboard .bg-sky-50 { background:#f1f8fb!important; }
+.app-dashboard .bg-sky-100 { background:#e6f3f9!important; }
+.app-dashboard .text-sky-700 { color:#236c92!important; }
+.app-dashboard .metric-pill { color:#236c92; background:#eaf5fa; border-color:#d9ebf3; }
+.app-dashboard .primary-btn { min-height:44px; border-radius:12px!important; background:linear-gradient(135deg,#318ab7,#225f86)!important; box-shadow:0 7px 16px rgba(35,104,143,.16)!important; text-transform:none!important; letter-spacing:0!important; }
+.app-dashboard .primary-btn:hover { filter:brightness(1.05); }
+.app-dashboard .secondary-btn { border-radius:11px!important; background:#edf6fa!important; border-color:#dcebf2!important; color:#236b91!important; }
+.app-dashboard .text-ink\/60 { color:#71899a!important; }
+.app-dashboard .text-ink\/70 { color:#698294!important; }
+.app-dashboard .text-ink { color:#17394e!important; }
+.app-dashboard .shadow-sm { box-shadow:0 5px 16px rgba(30,73,98,.045)!important; }
+.app-dashboard .rounded-2xl.bg-red-50 { border-radius:12px; }
+.app-dashboard .rounded-2xl.bg-emerald-50 { border-radius:12px; }
+.app-dashboard .rounded-2xl.bg-amber-50 { border-radius:12px; }
+.app-dashboard main > .app-card { margin-bottom:4px; }
+.app-dashboard .space-y-3 > :not([hidden]) ~ :not([hidden]) { margin-top:.8rem; }
+.app-dashboard .space-y-5 > :not([hidden]) ~ :not([hidden]) { margin-top:1.15rem; }
+
+.welcome-page,.role-page { min-height:100%; padding:28px 30px 30px; display:flex; flex-direction:column; background:radial-gradient(ellipse at 100% 0%,rgba(90,167,218,.15),transparent 40%),linear-gradient(180deg,#f8fbfd 0%,#eff6f9 100%); font-family:Inter,"Segoe UI",Arial,sans-serif; }
+.welcome-topline { display:flex; align-items:center; gap:10px; color:#12344b; font-size:21px; font-weight:850; letter-spacing:-.8px; }
+.welcome-campus-tag { margin-left:auto; padding:7px 10px; border:1px solid #dceaf1; border-radius:999px; color:#6a8798; font-size:8px; font-weight:800; letter-spacing:1px; }
+.welcome-hero { position:relative; margin:auto 0; padding:24px 0 30px; }
+.welcome-illustration { position:relative; width:210px; height:190px; margin:0 auto 28px; display:grid; place-items:center; }
+.welcome-orbit { position:absolute; border:1px solid rgba(54,139,180,.18); border-radius:50%; }
+.orbit-one { width:178px; height:178px; }
+.orbit-two { width:135px; height:135px; border-style:dashed; }
+.welcome-emoji { z-index:1; width:104px; height:104px; display:grid; place-items:center; border-radius:32px; background:linear-gradient(145deg,#dff1f8,#fff); box-shadow:0 17px 36px rgba(38,111,148,.13); font-size:55px; }
+.welcome-spark { position:absolute; color:#328bb7; font-size:26px; }
+.spark-one { top:16px; right:25px; }
+.spark-two { bottom:20px; left:18px; }
+.welcome-hero > .auth-eyebrow { margin-bottom:12px; }
+.welcome-hero h1 { margin:0; color:#12344b; font-size:clamp(36px,9vw,48px); line-height:1.06; letter-spacing:-1.9px; font-weight:850; }
+.welcome-hero h1 span { color:#3288b4; }
+.welcome-hero p { max-width:330px; margin:16px 0 0; color:#6e8594; font-size:14px; line-height:1.75; }
+.welcome-bottom { margin-top:auto; }
+.welcome-cta { width:100%; min-height:54px; display:flex; align-items:center; justify-content:center; gap:18px; border:0; border-radius:14px; background:linear-gradient(135deg,#318ab7,#225f86); color:#fff; font-size:14px; font-weight:800; box-shadow:0 10px 22px rgba(35,104,143,.2); cursor:pointer; }
+.welcome-cta span { font-size:19px; }
+.welcome-bottom p { margin:14px 0 0; color:#91a2ad; font-size:10px; letter-spacing:1.4px; text-align:center; }
+.role-page .auth-back { margin-bottom:25px; }
+.role-heading { margin:50px 0 28px; }
+.role-heading h1 { margin:0; color:#12344b; font-size:36px; line-height:1.1; letter-spacing:-1.4px; font-weight:850; }
+.role-heading p { margin:12px 0 0; color:#718797; font-size:13px; }
+.role-options { display:grid; gap:13px; }
+.role-card { display:flex; align-items:center; gap:14px; width:100%; padding:17px; border:1px solid #e0ebf0; border-radius:18px; background:rgba(255,255,255,.92); box-shadow:0 8px 24px rgba(25,70,96,.05); text-align:left; cursor:pointer; transition:transform .18s,border-color .18s,box-shadow .18s; }
+.role-card:hover { transform:translateY(-2px); border-color:#b9d9e8; box-shadow:0 12px 28px rgba(25,70,96,.09); }
+.role-icon { width:50px; height:50px; flex:0 0 50px; display:grid; place-items:center; border-radius:15px; background:#e9f5fa; font-size:24px; }
+.driver-role-icon { background:#eef3f7; }
+.role-copy { display:grid; gap:5px; flex:1; }
+.role-copy strong { color:#17394e; font-size:14px; font-weight:800; }
+.role-copy small { color:#7b909d; font-size:11px; line-height:1.5; }
+.role-arrow { color:#368ab3; font-size:22px; }
+.role-footnote { margin-top:auto; padding-top:28px; color:#91a2ad; font-size:10px; text-align:center; }
+@media (max-width:600px) {
+  .phone-shell { padding:0; }
+  .phone-screen { width:100%; max-width:100%; min-height:100vh; height:100vh; border:0; border-radius:0; box-shadow:none; }
+  .welcome-page,.role-page { padding:24px 23px 28px; }
+  .app-main { padding:18px 16px 26px!important; }
+  .app-header { padding:27px 20px 22px!important; }
+  .app-card { padding:16px!important; }
+}
