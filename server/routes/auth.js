@@ -12,11 +12,11 @@ const NID = /^(\d{10}|\d{13}|\d{17})$/
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
 
 function publicStudent(student) {
-  const { password, ...safe } = student
+  const { password, googleId, ...safe } = student
   return { ...safe, name: safe.username, role: 'student' }
 }
 function publicDriver(driver) {
-  const { password, ...safe } = driver
+  const { password, googleId, nid, nidHash, ...safe } = driver
   return { ...safe, identifier: safe.phone, role: 'driver' }
 }
 function hashNid(value) {
