@@ -105,15 +105,17 @@ export default function StudentSignup() {
             {['Muktijoddha Hall', 'Shahid Mohammad Shah Hall', 'Dr. Qudrat-E-Khuda Hall', 'Kabi Kazi Nazrul Islam Hall', 'Shaheed Tareq Huda Hall', 'Shaheed Abu Sayed Hall', 'Sufia Kamal Hall', 'Begum Shamsunnahar Khan Hall', 'Tapashi Rabeya Hall'].map((hall) => <option key={hall}>{hall}</option>)}
           </select>
         </Field>
-        {!googleCredential && <Field label="Password">
-          <input
-            className={inputClass}
-            type="password"
-            placeholder="At least 6 characters"
-            value={form.password}
-            onChange={(e) => update('password', e.target.value)}
-          />
-        </Field>
+        {!googleCredential && (
+          <Field label="Password">
+            <input
+              className={inputClass}
+              type="password"
+              placeholder="At least 6 characters"
+              value={form.password}
+              onChange={(e) => update('password', e.target.value)}
+            />
+          </Field>
+        )}
 
         {error && <p className="text-rose-500 text-sm mb-3">{error}</p>}
 
