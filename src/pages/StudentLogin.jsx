@@ -2,18 +2,22 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import GoogleAuthButton from '../components/GoogleAuthButton.jsx'
+import { useFeedback } from '../context/FeedbackContext.jsx'
 
 export default function StudentLogin() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const { googleLogin } = useAuth()
+  const notify = useFeedback()
   const navigate = useNavigate()
   async function handleGoogle(credential) {
     if (busy) return
     setError(''); setBusy(true)
+    notify('Signing you in…', 'loading', 0)
     const result = await googleLogin(credential, 'student')
     setBusy(false)
-    if (!result.ok) return setError(result.message)
+    if (!result.ok) { notify(result.message, 'error'); return setError(result.message) }
+    notify('You are signed in.', 'success')
     navigate('/student/home', { replace: true })
   }
   return <div className="auth-page">
