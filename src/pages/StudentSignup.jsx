@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import Field, { inputClass } from '../components/Field.jsx'
+import GoogleAuthButton from '../components/GoogleAuthButton.jsx'
 
 const CUET_EMAIL = /^u\d{7}@student\.cuet\.ac\.bd$/i
 const STUDENT_ID = /^\d{7}$/
@@ -10,7 +11,8 @@ export default function StudentSignup() {
   const [form, setForm] = useState({ name: '', email: '', studentId: '', gender: '', hall: '', password: '' })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const { studentSignup } = useAuth()
+  const [googleCredential, setGoogleCredential] = useState('')
+  const { studentSignup, googleAuth } = useAuth()
   const navigate = useNavigate()
 
   function update(key, value) {
@@ -26,17 +28,17 @@ export default function StudentSignup() {
     }
     if (!STUDENT_ID.test(form.studentId)) return setError('Enter your 7-digit student ID, e.g. 2204064')
     if (!form.gender) return setError('Select your gender.')
-    if (form.password.length < 6) return setError('Password must be at least 6 characters.')
+    if (!googleCredential && form.password.length < 6) return setError('Password must be at least 6 characters.')
 
     setBusy(true)
-    const res = await studentSignup({
-      name: form.name,
-      email: form.email.toLowerCase(),
-      studentId: form.studentId,
-      gender: form.gender,
-      hall: form.hall,
-      password: form.password,
-    })
+    const res = googleCredential
+      ? await googleAuth(googleCredential, 'student', 'signup', {
+          name: form.name, studentId: form.studentId, gender: form.gender, hall: form.hall,
+        })
+      : await studentSignup({
+          name: form.name, email: form.email.toLowerCase(), studentId: form.studentId,
+          gender: form.gender, hall: form.hall, password: form.password,
+        })
     setBusy(false)
     if (!res.ok) return setError(res.message)
     navigate('/student/home')
@@ -50,6 +52,8 @@ export default function StudentSignup() {
       <h1 className="font-display text-2xl text-ink mb-1">Create Student Account</h1>
       <p className="text-ink/60 text-sm mb-8">Only for verified CUET students</p>
 
+      <GoogleAuthButton text="signup_with" onSuccess={setGoogleCredential} onError={setError} />
+      {googleCredential && <p className="text-center text-xs text-green-700 mb-3">Google account verified. Complete the remaining details below.</p>}
       <form onSubmit={handleSubmit} className="flex-1 flex flex-col">
         <Field label="Full Name">
           <input
@@ -101,7 +105,7 @@ export default function StudentSignup() {
             {['Muktijoddha Hall', 'Shahid Mohammad Shah Hall', 'Dr. Qudrat-E-Khuda Hall', 'Kabi Kazi Nazrul Islam Hall', 'Shaheed Tareq Huda Hall', 'Shaheed Abu Sayed Hall', 'Sufia Kamal Hall', 'Begum Shamsunnahar Khan Hall', 'Tapashi Rabeya Hall'].map((hall) => <option key={hall}>{hall}</option>)}
           </select>
         </Field>
-        <Field label="Password">
+        {!googleCredential && <Field label="Password">
           <input
             className={inputClass}
             type="password"
