@@ -8,25 +8,25 @@ export default function DriverLogin() {
   const [busy, setBusy] = useState(false)
   const { googleLogin } = useAuth()
   const navigate = useNavigate()
-
   async function handleGoogle(credential) {
-    setError('')
-    setBusy(true)
+    if (busy) return
+    setError(''); setBusy(true)
     const result = await googleLogin(credential, 'driver')
     setBusy(false)
     if (!result.ok) return setError(result.message)
-    navigate('/driver/home')
+    navigate('/driver/home', { replace: true })
   }
-
-  return (
-    <div className="bn h-full min-h-full flex flex-col px-7 py-10 bg-cream">
-      <button onClick={() => navigate('/role')} className="text-lilac-600 text-sm mb-6 self-start">← ফিরে যান</button>
-      <h1 className="font-display text-2xl text-ink mb-1">চালক লগইন</h1>
-      <p className="text-ink/60 text-sm mb-8">আপনার নিবন্ধিত Gmail দিয়ে প্রবেশ করুন</p>
-      <GoogleAuthButton onSuccess={handleGoogle} onError={setError} />
-      {busy && <p className="text-center text-sm text-ink/60">Gmail যাচাই হচ্ছে...</p>}
-      {error && <p className="text-rose-500 text-sm text-center mb-3">{error}</p>}
-      <p className="text-center text-sm text-ink/60 mt-6">নতুন চালক? <Link to="/driver/signup" className="text-lilac-600 font-medium">অ্যাকাউন্ট খুলুন</Link></p>
+  return <div className="auth-page bn">
+    <button onClick={() => navigate('/role')} className="auth-back">← ফিরে যান</button>
+    <div className="auth-brand"><span className="auth-brand-mark">C</span><span>CUET<span className="auth-brand-accent">Go</span></span></div>
+    <div className="auth-heading"><span className="auth-eyebrow">DRIVER ACCESS</span><h1>চালক লগইন</h1><p>আপনার নিবন্ধিত Gmail দিয়ে প্রবেশ করুন।</p></div>
+    <div className="auth-panel auth-login-panel">
+      <div className="auth-icon-tile">🛺</div><h2>আবার স্বাগতম</h2>
+      <p className="auth-panel-copy">অ্যাকাউন্ট তৈরির সময় যে Gmail ব্যবহার করেছিলেন, সেটি বেছে নিন।</p>
+      <div className="auth-google">{busy ? <p className="auth-progress">Gmail যাচাই হচ্ছে…</p> : <GoogleAuthButton onSuccess={handleGoogle} onError={setError} />}</div>
+      {error && <p className="auth-error" role="alert">{error}</p>}
+      <p className="auth-privacy">শুধু নিবন্ধিত Gmail দিয়েই লগইন করা যাবে।</p>
     </div>
-  )
+    <p className="auth-switch">নতুন চালক? <Link to="/driver/signup">অ্যাকাউন্ট খুলুন</Link></p>
+  </div>
 }
