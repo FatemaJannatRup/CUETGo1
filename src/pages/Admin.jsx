@@ -14,7 +14,10 @@ export default function Admin() {
   const [checking, setChecking] = useState(true)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [activeTab, setActiveTab] = useState('Overview')
+  const [activeTab, setActiveTab] = useState(() => {
+    const saved = sessionStorage.getItem('cuetgo_admin_tab')
+    return tabs.includes(saved) ? saved : 'Overview'
+  })
   const [overview, setOverview] = useState(null)
   const [drivers, setDrivers] = useState([])
   const [students, setStudents] = useState([])
@@ -43,6 +46,10 @@ export default function Admin() {
       setLoading(false)
     }
   }, [driverFilter])
+
+  useEffect(() => {
+    sessionStorage.setItem('cuetgo_admin_tab', activeTab)
+  }, [activeTab])
 
   useEffect(() => {
     const token = localStorage.getItem('cuetgo_admin_token')
