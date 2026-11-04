@@ -3,9 +3,23 @@ const isLocalNetworkHost = ['localhost', '127.0.0.1', '::1'].includes(window.loc
   || window.location.hostname.startsWith('192.168.')
   || window.location.hostname.startsWith('172.')
 
-const API_BASE = isLocalNetworkHost
-  ? `http://${window.location.hostname}:5000/api`
-  : (import.meta.env.VITE_API_URL || 'https://gonad-humped-rockiness.ngrok-free.dev/api')
+// In production (Render), VITE_API_URL will be the backend base URL
+// We automatically append /api if it is missing
+function getApiBase() {
+  if (isLocalNetworkHost) {
+    return `http://${window.location.hostname}:5000/api`
+  }
+
+  const envUrl = import.meta.env.VITE_API_URL
+  if (!envUrl) {
+    return 'https://gonad-humped-rockiness.ngrok-free.dev/api' // fallback
+  }
+
+  // Make sure it ends with /api
+  return envUrl.endsWith('/api') ? envUrl : `${envUrl.replace(/\/$/, '')}/api`
+}
+
+const API_BASE = getApiBase()
 
 function getToken() {
   return localStorage.getItem('csr_token')
@@ -14,9 +28,9 @@ function getToken() {
 async function request(path, { method = 'GET', body, auth = false } = {}) {
   const headers = {}
 
-if (body) {
-  headers['Content-Type'] = 'application/json'
-}
+  if (body) {
+    headers['Content-Type'] = 'application/json'
+  }
   if (auth) {
     const token = getToken()
     if (token) headers.Authorization = `Bearer ${token}`

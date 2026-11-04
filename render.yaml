@@ -14,9 +14,9 @@ services:
       - key: NODE_ENV
         value: production
       - key: JWT_SECRET
-        generateValue: true          # Render will auto-generate a secure secret
+        generateValue: true
       - key: GEMINI_API_KEY
-        sync: false                 # Leave empty or set your key later in dashboard
+        sync: false
 
   # ======================
   # Frontend (React + Vite Static Site)
@@ -35,5 +35,3 @@ services:
           name: cuetgo-backend
           type: web
           envVarKey: RENDER_EXTERNAL_URL
-        # This will become: https://cuetgo-backend.onrender.com
-        # We append /api in the next step if needed
