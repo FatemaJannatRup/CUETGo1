@@ -14,6 +14,8 @@ const GMAIL = /^[a-zA-Z0-9._%+-]+@gmail\.com$/
 const PHONE = /^01[3-9]\d{8}$/
 const NID = /^\d{10}$|^\d{13}$|^\d{17}$/
 
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
+
 function publicStudent(s) {
   const { password, ...rest } = s
   return { ...rest, role: 'student' }
