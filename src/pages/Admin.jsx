@@ -41,7 +41,9 @@ export default function Admin() {
       setDrivers(driverData.drivers)
       setStudents(studentData.students)
       setRides(rideData.rides)
+      return true
     } catch (e) {
+      return false
       setError(e.message)
       if (/session|logged|token|unauthorized/i.test(e.message)) logout()
     } finally {
@@ -107,6 +109,7 @@ export default function Admin() {
       setNotice(`Driver application ${status} successfully.`)
       await loadDashboard()
     } catch (e) {
+      notify(e.message, 'error')
       setError(e.message)
     } finally {
       setBusyId('')
@@ -125,6 +128,7 @@ export default function Admin() {
       setNotice('Ride cancelled.')
       await loadDashboard()
     } catch (e) {
+      notify(e.message, 'error')
       setError(e.message)
     } finally {
       setBusyId('')
@@ -155,7 +159,7 @@ export default function Admin() {
   return <div className="admin-page">
     <header className="admin-header">
       <div><div className="admin-brand"><span className="admin-mark-small">C</span> CUET<span>Go</span> <b>ADMIN</b></div><p>Platform control centre</p></div>
-      <div className="admin-header-actions"><span>{admin.email}</span><button onClick={() => { notify('Refreshing dashboard…', 'loading', 0); loadDashboard().then(() => notify('Dashboard updated.', 'success')) }} disabled={loading}>↻ Refresh</button><button onClick={() => { notify('Signing out…', 'loading', 0); window.setTimeout(logout, 500) }}>Sign out</button></div>
+      <div className="admin-header-actions"><span>{admin.email}</span><button onClick={() => { notify('Refreshing dashboard…', 'loading', 0); loadDashboard().then(ok => { if (ok) notify('Dashboard updated.', 'success'); else notify('Could not refresh the dashboard.', 'error') }) }} disabled={loading}>↻ Refresh</button><button onClick={() => { notify('Signing out…', 'loading', 0); window.setTimeout(logout, 500) }}>Sign out</button></div>
     </header>
     <main className="admin-main">
       <div className="admin-welcome"><div><span className="admin-eyebrow">ADMINISTRATION</span><h1>Dashboard</h1><p>Review registrations and monitor campus ride activity.</p></div><span className="admin-secure">🔒 Secure admin session</span></div>
