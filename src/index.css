@@ -133,3 +133,56 @@ button, input, select, textarea {
     border: none;
   }
 }
+
+
+/* Authentication experience */
+html, body { min-height: 100%; }
+.auth-page {
+  min-height: 100%;
+  padding: 30px 34px 28px;
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(ellipse at 100% 0%, rgba(90,167,218,.13), transparent 42%), linear-gradient(180deg,#f8fbfd 0%,#f1f7fa 100%);
+  font-family: Inter,"Segoe UI",Arial,sans-serif;
+}
+.auth-back { align-self:flex-start; border:0; padding:7px 0; margin-bottom:26px; background:transparent; color:#53738a; font-size:13px; font-weight:650; cursor:pointer; }
+.auth-back:hover { color:#176b9d; }
+.auth-brand { display:flex; align-items:center; gap:10px; color:#12344b; font-size:21px; font-weight:850; letter-spacing:-.8px; }
+.auth-brand-mark { width:34px; height:34px; display:grid; place-items:center; border-radius:11px; color:white; background:linear-gradient(145deg,#2589bd,#145477); box-shadow:0 6px 14px rgba(22,101,145,.25); font-size:18px; }
+.auth-brand-accent { color:#2589bd; }
+.auth-heading { margin:34px 0 24px; }
+.auth-eyebrow { display:inline-block; margin-bottom:10px; color:#2581ad; font-size:10px; font-weight:850; letter-spacing:1.8px; }
+.auth-heading h1 { margin:0; color:#102f45; font-size:clamp(27px,6vw,34px); line-height:1.14; letter-spacing:-1.1px; font-weight:800; }
+.auth-heading p { margin:10px 0 0; color:#698093; font-size:14px; line-height:1.6; }
+.auth-panel { padding:25px 22px 20px; border:1px solid rgba(71,125,158,.14); border-radius:22px; background:rgba(255,255,255,.94); box-shadow:0 14px 38px rgba(24,65,92,.07); }
+.auth-panel label { margin-bottom:8px; }
+.auth-panel label > span:first-child { color:#29485e; font-size:12px; font-weight:750; }
+.auth-input { min-height:49px; border:1px solid #d9e5ec!important; border-radius:12px!important; background:#f9fcfd!important; color:#17364b!important; font-size:14px!important; transition:border-color .18s,box-shadow .18s,background .18s; }
+.auth-input:focus { border-color:#4a9bc5!important; background:#fff!important; box-shadow:0 0 0 3px rgba(74,155,197,.12); }
+.auth-hint { margin:7px 0 18px; color:#8193a0; font-size:11px; line-height:1.5; }
+.auth-divider { display:flex; align-items:center; gap:12px; margin:17px 0 13px; color:#8a9ca8; font-size:9px; font-weight:800; letter-spacing:1.25px; }
+.auth-divider:before,.auth-divider:after { content:""; flex:1; height:1px; background:#e7eef2; }
+.auth-google { min-height:48px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+.auth-google > div { max-width:100%; }
+.auth-google iframe { max-width:100%; }
+.auth-google-disabled { justify-content:flex-start; gap:12px; padding:0 15px; border:1px dashed #d5e1e8; border-radius:12px; background:#f8fbfc; color:#92a2ad; font-size:11px; }
+.auth-google-disabled span:first-child { display:grid; place-items:center; width:25px; height:25px; border-radius:50%; background:white; color:#4285f4; font-size:17px; font-weight:800; }
+.auth-progress { color:#32799d; font-size:13px; text-align:center; }
+.auth-error { margin:13px 0 0; padding:10px 12px; border:1px solid #f3d1d1; border-radius:10px; background:#fff7f6; color:#bd4545; font-size:12px; line-height:1.5; }
+.auth-privacy { margin:18px 0 0; color:#82939e; font-size:10px; line-height:1.65; text-align:center; }
+.auth-privacy strong { color:#55768a; font-weight:750; }
+.auth-switch { margin:auto 0 0; padding-top:26px; color:#728797; font-size:12px; text-align:center; }
+.auth-switch a { color:#1679a8; font-weight:800; text-decoration:none; }
+.auth-switch a:hover { text-decoration:underline; }
+.auth-login-panel { margin-top:2px; text-align:center; }
+.auth-icon-tile { width:54px; height:54px; margin:0 auto 15px; display:grid; place-items:center; border-radius:17px; background:#e8f4fa; font-size:25px; }
+.auth-login-panel h2 { margin:0; color:#17384e; font-size:17px; font-weight:800; }
+.auth-panel-copy { margin:8px auto 18px; max-width:280px; color:#758b9a; font-size:12px; line-height:1.6; }
+.auth-loading { min-height:65vh; display:grid; place-items:center; color:#668194; font-size:13px; }
+.bn.auth-page { font-family:"Noto Sans Bengali","Segoe UI",sans-serif; }
+@media (max-width:600px) {
+  .phone-shell { padding:0; background:#f8fbfd; }
+  .phone-screen { max-width:100%; min-height:100vh; height:100vh; border-radius:0; border:none; box-shadow:none; }
+  .auth-page { padding:24px 22px; }
+  .auth-heading { margin-top:28px; }
+}
