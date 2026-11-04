@@ -3,21 +3,25 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import Field, { inputClass } from '../components/Field.jsx'
 import GoogleAuthButton from '../components/GoogleAuthButton.jsx'
+import { useFeedback } from '../context/FeedbackContext.jsx'
 
 export default function DriverSignup() {
   const [form, setForm] = useState({ name: '', nid: '', phone: '' })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const { googleSignup } = useAuth()
+  const notify = useFeedback()
   const navigate = useNavigate()
   function update(key, value) { setForm(current => ({ ...current, [key]: value })); setError('') }
   const valid = form.name.trim().length >= 2 && /^(\d{10}|\d{13}|\d{17})$/.test(form.nid.trim()) && /^01[3-9]\d{8}$/.test(form.phone.trim())
   async function handleGoogle(credential) {
     if (!valid || busy) return
     setError(''); setBusy(true)
+    notify('আপনার চালক অ্যাকাউন্ট তৈরি হচ্ছে…', 'loading', 0)
     const result = await googleSignup(credential, 'driver', form)
     setBusy(false)
-    if (!result.ok) return setError(result.message)
+    if (!result.ok) { notify(result.message, 'error'); return setError(result.message) }
+    notify('চালক অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে।', 'success')
     navigate('/driver/home', { replace: true })
   }
   return <div className="auth-page bn">
