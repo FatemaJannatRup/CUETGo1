@@ -6,6 +6,16 @@ import { findMatches } from '../services/gemini.js'
 
 const router = Router()
 
+function requireApprovedDriver(req, res, next) {
+  const db = readDb()
+  const driver = db.drivers.find((item) => item.id === req.user.id)
+  if (!driver) return res.status(404).json({ message: 'Driver account not found.' })
+  if (driver.verificationStatus !== 'approved') {
+    return res.status(403).json({ message: 'Your driver account is awaiting administrator approval.' })
+  }
+  next()
+}
+
 const HALLS = [
   'Muktijoddha Hall', 'Shahid Mohammad Shah Hall', 'Dr. Qudrat-E-Khuda Hall',
   'Kabi Kazi Nazrul Islam Hall', 'Shaheed Tareq Huda Hall', 'Shaheed Abu Sayed Hall',
@@ -157,7 +167,7 @@ router.get('/mine', requireAuth('student'), (req, res) => {
   res.json({ rides: mine })
 })
 
-router.get('/pending', requireAuth('driver'), (req, res) => {
+router.get('/pending', requireAuth('driver'), requireApprovedDriver, (req, res) => {
   const db = readDb()
   const pending = db.rides
     .filter((r) => r.status === 'pending')
@@ -186,7 +196,7 @@ router.get('/pending', requireAuth('driver'), (req, res) => {
   res.json({ groups: Object.values(grouped) })
 })
 
-router.post('/accept', requireAuth('driver'), (req, res) => {
+router.post('/accept', requireAuth('driver'), requireApprovedDriver, (req, res) => {
   const { rideIds } = req.body || {}
   if (!Array.isArray(rideIds) || rideIds.length === 0) {
     return res.status(400).json({ message: 'No ride selected.' })
@@ -225,7 +235,7 @@ router.post('/accept', requireAuth('driver'), (req, res) => {
   res.json({ accepted: selectedRideIds.length })
 })
 
-router.post('/:id/complete', requireAuth('driver'), (req, res) => {
+router.post('/:id/complete', requireAuth('driver'), requireApprovedDriver, (req, res) => {
   const db = readDb()
   const ride = db.rides.find((item) => item.id === req.params.id && item.driverId === req.user.id)
   if (!ride) return res.status(404).json({ message: 'Ride not found.' })
@@ -237,7 +247,7 @@ router.post('/:id/complete', requireAuth('driver'), (req, res) => {
   res.json({ ride })
 })
 
-router.get('/mine-driver', requireAuth('driver'), (req, res) => {
+router.get('/mine-driver', requireAuth('driver'), requireApprovedDriver, (req, res) => {
   const db = readDb()
   const mine = db.rides
     .filter((r) => r.driverId === req.user.id)
