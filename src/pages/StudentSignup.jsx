@@ -3,12 +3,14 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import Field, { inputClass } from '../components/Field.jsx'
 import GoogleAuthButton from '../components/GoogleAuthButton.jsx'
+import { useFeedback } from '../context/FeedbackContext.jsx'
 
 export default function StudentSignup() {
   const [username, setUsername] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const { googleSignup } = useAuth()
+  const notify = useFeedback()
   const navigate = useNavigate()
   const valid = /^[a-zA-Z0-9_.-]{3,24}$/.test(username.trim())
 
@@ -16,9 +18,11 @@ export default function StudentSignup() {
     if (!valid || busy) return
     setError('')
     setBusy(true)
+    notify('Creating your student account…', 'loading', 0)
     const result = await googleSignup(credential, 'student', { username: username.trim() })
     setBusy(false)
-    if (!result.ok) return setError(result.message)
+    if (!result.ok) { notify(result.message, 'error'); return setError(result.message) }
+    notify('Your account is ready. Welcome to CUETGo!', 'success')
     navigate('/student/home', { replace: true })
   }
 
