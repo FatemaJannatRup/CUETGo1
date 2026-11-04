@@ -25,7 +25,6 @@ services:
     name: cuetgo-frontend
     runtime: static
     plan: free
-    region: singapore
     rootDir: .
     buildCommand: npm install && npm run build
     staticPublishPath: dist
