@@ -54,6 +54,7 @@ export default function DriverHome() {
       notify('প্রোফাইল সফলভাবে আপডেট হয়েছে।', 'success')
       setSuccess('প্রোফাইল আপডেট হয়েছে।')
     } catch (err) {
+      notify(err.message, 'error')
       setError(err.message)
     } finally {
       setSavingProfile(false)
@@ -70,6 +71,7 @@ export default function DriverHome() {
       setSuccess('যাত্রা গ্রহণ করা হয়েছে। যাত্রীদের জানিয়ে দেওয়া হয়েছে।')
       await refresh()
     } catch (e) {
+      notify(e.message, 'error')
       setError(e.message)
     }
   }
@@ -84,6 +86,7 @@ export default function DriverHome() {
       setSuccess('যাত্রা সম্পন্ন হিসেবে চিহ্নিত করা হয়েছে।')
       await refresh()
     } catch (e) {
+      notify(e.message, 'error')
       setError(e.message)
     }
   }
