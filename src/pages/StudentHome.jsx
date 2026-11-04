@@ -133,6 +133,7 @@ export default function StudentHome() {
       setSuccess('You joined the ride successfully.')
       await refreshData()
     } catch (err) {
+      notify(err.message, 'error')
       setError(err.message)
     } finally {
       setJoiningId(null)
@@ -152,6 +153,7 @@ export default function StudentHome() {
       setSuccess('Profile updated.')
       setTimeout(() => setSuccess(''), 2400)
     } catch (err) {
+      notify(err.message, 'error')
       setError(err.message)
     } finally {
       setSavingProfile(false)
