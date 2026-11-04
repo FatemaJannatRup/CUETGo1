@@ -17,7 +17,9 @@ services:
         generateValue: true
       - key: GOOGLE_CLIENT_ID
         sync: false
-      - key: ADMIN_APPROVAL_KEY
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD_HASH
         sync: false
       - key: GEMINI_API_KEY
         sync: false
