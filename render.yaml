@@ -1,0 +1,39 @@
+services:
+  # ======================
+  # Backend (Express API)
+  # ======================
+  - type: web
+    name: cuetgo-backend
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true          # Render will auto-generate a secure secret
+      - key: GEMINI_API_KEY
+        sync: false                 # Leave empty or set your key later in dashboard
+
+  # ======================
+  # Frontend (React + Vite Static Site)
+  # ======================
+  - type: web
+    name: cuetgo-frontend
+    runtime: static
+    plan: free
+    region: singapore
+    rootDir: .
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          name: cuetgo-backend
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+        # This will become: https://cuetgo-backend.onrender.com
+        # We append /api in the next step if needed
