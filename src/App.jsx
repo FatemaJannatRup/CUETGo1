@@ -7,6 +7,7 @@ import DriverLogin from './pages/DriverLogin.jsx'
 import DriverSignup from './pages/DriverSignup.jsx'
 import StudentHome from './pages/StudentHome.jsx'
 import DriverHome from './pages/DriverHome.jsx'
+import Admin from './pages/Admin.jsx'
 import { useAuth } from './context/AuthContext.jsx'
 
 function Protected({ role, children }) {
@@ -25,6 +26,7 @@ export default function App() {
   return <div className="phone-shell"><div className="phone-screen"><div className="screen-scroll">
     <Routes>
       <Route path="/" element={<Welcome />} />
+      <Route path="/admin" element={<Admin />} />
       <Route path="/role" element={<RoleSelect />} />
       <Route path="/student/login" element={<GuestOnly><StudentLogin /></GuestOnly>} />
       <Route path="/student/signup" element={<GuestOnly><StudentSignup /></GuestOnly>} />
