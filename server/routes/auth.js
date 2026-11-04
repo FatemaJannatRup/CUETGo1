@@ -210,25 +210,59 @@ router.put('/profile', requireAuth(), (req, res) => {
   if (req.user.role === 'student') {
     const student = db.students.find((s) => s.id === req.user.id)
     if (!student) return res.status(404).json({ message: 'Account not found.' })
-    const username = String(req.body?.username || '').trim()
-    if (username && username !== student.username) {
-      if (username.length < 3 || username.length > 24 || !/^[a-zA-Z0-9_.-]+$/.test(username)) {
-        return res.status(400).json({ message: 'Username must be 3–24 valid characters.' })
-      }
-      if (db.students.some((s) => s.id !== student.id && normalize(s.username) === normalize(username))) {
-        return res.status(409).json({ message: 'That username is already taken.' })
-      }
-      student.username = username
-      student.name = username
+
+    const username = String(req.body?.username ?? student.username ?? '').trim()
+    const hall = String(req.body?.hall ?? student.hall ?? '').trim()
+    const gender = String(req.body?.gender ?? student.gender ?? '').trim()
+    const allowedHalls = [
+      'Muktijoddha Hall', 'Shahid Mohammad Shah Hall', 'Dr. Qudrat-E-Khuda Hall',
+      'Kabi Kazi Nazrul Islam Hall', 'Shaheed Tareq Huda Hall', 'Shaheed Abu Sayed Hall',
+      'Sufia Kamal Hall', 'Begum Shamsunnahar Khan Hall', 'Tapashi Rabeya Hall',
+    ]
+    if (username.length < 3 || username.length > 24 || !/^[a-zA-Z0-9_.-]+$/.test(username)) {
+      return res.status(400).json({ message: 'Username must be 3–24 valid characters.' })
     }
+    if (db.students.some((s) => s.id !== student.id && normalize(s.username) === normalize(username))) {
+      return res.status(409).json({ message: 'That username is already taken.' })
+    }
+    if (hall && !allowedHalls.includes(hall)) {
+      return res.status(400).json({ message: 'Choose a valid CUET hall.' })
+    }
+    if (gender && !['male', 'female', 'unknown'].includes(gender)) {
+      return res.status(400).json({ message: 'Choose a valid gender option.' })
+    }
+
+    student.username = username
+    student.name = username
+    student.hall = hall
+    student.gender = gender
     writeDb(db)
     return res.json({ user: publicStudent(student) })
   }
+
   if (req.user.role === 'driver') {
     const driver = db.drivers.find((d) => d.id === req.user.id)
     if (!driver) return res.status(404).json({ message: 'Account not found.' })
+
+    const name = String(req.body?.name ?? driver.name ?? '').trim()
+    const phone = String(req.body?.phone ?? driver.phone ?? '').trim()
+    if (name.length < 2 || name.length > 80) {
+      return res.status(400).json({ message: 'Name must be between 2 and 80 characters.' })
+    }
+    if (!PHONE.test(phone)) {
+      return res.status(400).json({ message: 'Enter a valid Bangladeshi mobile number, e.g. 017XXXXXXXX.' })
+    }
+    if (db.drivers.some((d) => d.id !== driver.id && String(d.phone || '') === phone)) {
+      return res.status(409).json({ message: 'This phone number is already associated with another account.' })
+    }
+
+    driver.name = name
+    driver.phone = phone
+    driver.identifier = phone
+    writeDb(db)
     return res.json({ user: publicDriver(driver) })
   }
+
   return res.status(403).json({ message: 'Invalid account role.' })
 })
 
