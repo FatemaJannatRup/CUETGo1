@@ -167,6 +167,9 @@ router.post('/google', async (req, res) => {
       if (!CUET_EMAIL.test(email)) {
         return res.status(403).json({ message: 'Students must use their verified CUET student Google account.' })
       }
+      if (profile.email && String(profile.email).trim().toLowerCase() !== email) {
+        return res.status(400).json({ message: 'The entered CUET email does not match the Google account you selected.' })
+      }
       account = db.students.find((s) => s.email.toLowerCase() === email)
 
       if (!account && intent === 'login') {
@@ -207,6 +210,9 @@ router.post('/google', async (req, res) => {
     } else {
       if (!GMAIL.test(email)) {
         return res.status(403).json({ message: 'Drivers must use a verified Gmail account.' })
+      }
+      if (profile.identifier && String(profile.identifier).trim().toLowerCase() !== email) {
+        return res.status(400).json({ message: 'The entered Gmail address does not match the Google account you selected.' })
       }
       account = db.drivers.find((d) => (d.identifier || '').toLowerCase() === email)
 
