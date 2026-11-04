@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 export default function Welcome() {
   const navigate = useNavigate()
@@ -10,6 +10,6 @@ export default function Welcome() {
       <h1>Your campus.<br/><span>Your people.</span><br/>One ride.</h1>
       <p>Share rickshaw rides across campus. Split fares, save money, and make every trip easier.</p>
     </div>
-    <div className="welcome-bottom"><button onClick={() => navigate('/role')} className="welcome-cta">Get started <span>→</span></button><p>Simple · Safe · Shared</p></div>
+    <div className="welcome-bottom"><button onClick={() => navigate('/role')} className="welcome-cta">Get started <span>→</span></button><p>Simple · Safe · Shared</p><Link className="welcome-admin-link" to="/admin">Administrator access</Link></div>
   </div>
 }
