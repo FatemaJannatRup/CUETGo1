@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
+import { OAuth2Client } from 'google-auth-library'
 import { readDb, writeDb } from '../db.js'
 import { signToken, requireAuth } from '../middleware/auth.js'
 
@@ -131,6 +132,119 @@ router.post('/driver/login', async (req, res) => {
 
   const token = signToken({ id: driver.id, role: 'driver' })
   res.json({ token, user: publicDriver(driver) })
+})
+
+
+// ---------- GOOGLE AUTHENTICATION ----------
+// Google verifies the identity; this route still issues the app's existing JWT.
+router.post('/google', async (req, res) => {
+  try {
+    const { credential, role, intent = 'login', profile = {} } = req.body || {}
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      return res.status(503).json({ message: 'Google sign-in is not configured on the server yet.' })
+    }
+    if (!credential || !['student', 'driver'].includes(role) || !['login', 'signup'].includes(intent)) {
+      return res.status(400).json({ message: 'Invalid Google sign-in request.' })
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    })
+    const googleUser = ticket.getPayload()
+    if (!googleUser?.email || googleUser.email_verified !== true) {
+      return res.status(401).json({ message: 'Google did not provide a verified email address.' })
+    }
+
+    const email = googleUser.email.trim().toLowerCase()
+    const googleName = String(googleUser.name || '').trim()
+    const db = readDb()
+    let account
+
+    if (role === 'student') {
+      if (!CUET_EMAIL.test(email)) {
+        return res.status(403).json({ message: 'Students must use their verified CUET student Google account.' })
+      }
+      account = db.students.find((s) => s.email.toLowerCase() === email)
+
+      if (!account && intent === 'login') {
+        return res.status(404).json({ message: 'No student account exists yet. Please create an account first.' })
+      }
+      if (!account) {
+        const studentId = String(profile.studentId || '').trim()
+        const gender = profile.gender
+        if (!STUDENT_ID.test(studentId) || email !== `u${studentId}@student.cuet.ac.bd`) {
+          return res.status(400).json({ message: 'Your 7-digit student ID must match your CUET email address.' })
+        }
+        if (!GENDERS.includes(gender)) {
+          return res.status(400).json({ message: 'Select your gender before continuing.' })
+        }
+        if (db.students.some((s) => s.studentId === studentId)) {
+          return res.status(409).json({ message: 'An account with this student ID already exists.' })
+        }
+        const randomPassword = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10)
+        account = {
+          id: crypto.randomUUID(),
+          name: googleName || String(profile.name || '').trim() || email.split('@')[0],
+          email,
+          studentId,
+          gender,
+          hall: String(profile.hall || ''),
+          password: randomPassword,
+          authProvider: 'google',
+          googleId: googleUser.sub,
+          createdAt: new Date().toISOString(),
+        }
+        db.students.push(account)
+      } else if (account.googleId && account.googleId !== googleUser.sub) {
+        return res.status(409).json({ message: 'This account is linked to a different Google account.' })
+      } else {
+        account.googleId = googleUser.sub
+        account.authProvider = account.authProvider || 'password+google'
+      }
+    } else {
+      if (!GMAIL.test(email)) {
+        return res.status(403).json({ message: 'Drivers must use a verified Gmail account.' })
+      }
+      account = db.drivers.find((d) => (d.identifier || '').toLowerCase() === email)
+
+      if (!account && intent === 'login') {
+        return res.status(404).json({ message: 'No driver account exists for this Gmail address. Please create an account first.' })
+      }
+      if (!account) {
+        const nid = String(profile.nid || '').trim()
+        if (!NID.test(nid)) {
+          return res.status(400).json({ message: 'Enter a valid NID number to create your driver account.' })
+        }
+        const randomPassword = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10)
+        account = {
+          id: crypto.randomUUID(),
+          name: googleName || String(profile.name || '').trim() || email.split('@')[0],
+          identifier: email,
+          nid,
+          rickshaw: String(profile.rickshaw || ''),
+          verified: false,
+          password: randomPassword,
+          authProvider: 'google',
+          googleId: googleUser.sub,
+          createdAt: new Date().toISOString(),
+        }
+        db.drivers.push(account)
+      } else if (account.googleId && account.googleId !== googleUser.sub) {
+        return res.status(409).json({ message: 'This account is linked to a different Google account.' })
+      } else {
+        account.googleId = googleUser.sub
+        account.authProvider = account.authProvider || 'password+google'
+      }
+    }
+
+    writeDb(db)
+    const token = signToken({ id: account.id, role })
+    return res.json({ token, user: role === 'student' ? publicStudent(account) : publicDriver(account) })
+  } catch (error) {
+    console.error('Google authentication failed:', error.message)
+    return res.status(401).json({ message: 'Google sign-in could not be verified. Please try again.' })
+  }
 })
 
 // ---------- SESSION ----------
