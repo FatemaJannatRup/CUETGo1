@@ -164,7 +164,7 @@ export default function DriverHome() {
                 <p className="mt-1 text-xs text-ink/60">{user?.email}</p>
               </div>
               <div className="rounded-2xl bg-sky-50 border border-sky-100 p-3">
-                <p className="text-[10px] uppercase tracking-[0.14em] text-ink/60">রিকশা</p>
+                <p className="text-[10px] uppercase tracking-[0.14em] text-ink/60">যাচাইয়ের অবস্থা</p>
                 <p className="mt-1 font-bold">{user?.verificationStatus || 'pending'}</p>
               </div>
             </div>
