@@ -149,8 +149,8 @@ export default function StudentHome() {
   }
 
   return (
-    <div className="h-full min-h-full flex flex-col bg-cream text-ink">
-      <header className="bg-gradient-to-br from-sky-500 via-sky-400 to-sky-600 text-ink px-6 pt-10 pb-6 rounded-b-[30px] shadow-soft">
+    <div className="app-dashboard h-full min-h-full flex flex-col bg-cream text-ink">
+      <header className="app-header bg-gradient-to-br from-sky-500 via-sky-400 to-sky-600 text-ink px-6 pt-10 pb-6 rounded-b-[30px] shadow-soft">
         <div className="flex justify-between items-start">
           <div>
             <p className="text-ink/70 text-xs uppercase tracking-[0.2em]">Student Dashboard</p>
@@ -168,8 +168,8 @@ export default function StudentHome() {
         </div>
       </header>
 
-      <main className="flex-1 px-5 py-5 overflow-y-auto">
-        <div className="flex gap-2 mb-5">
+      <main className="app-main flex-1 px-5 py-5 overflow-y-auto">
+        <div className="app-tabs flex gap-2 mb-5">
           {['dashboard', 'rides', 'profile'].map((value) => (
             <button
               key={value}
