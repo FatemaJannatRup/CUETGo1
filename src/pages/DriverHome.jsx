@@ -5,12 +5,15 @@ import { api } from '../api.js'
 const formatTime = (value) => new Date(value).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })
 
 export default function DriverHome() {
-  const { user, logout } = useAuth()
+  const { user, logout, updateProfile } = useAuth()
   const [groups, setGroups] = useState([])
   const [rides, setRides] = useState([])
   const [tab, setTab] = useState('requests')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [editingProfile, setEditingProfile] = useState(false)
+  const [profileForm, setProfileForm] = useState({ name: user?.name || '', phone: user?.phone || '' })
+  const [savingProfile, setSavingProfile] = useState(false)
 
   const refresh = async () => {
     try {
@@ -30,6 +33,27 @@ export default function DriverHome() {
     const timer = setInterval(refresh, 5000)
     return () => clearInterval(timer)
   }, [])
+
+  useEffect(() => {
+    setProfileForm({ name: user?.name || '', phone: user?.phone || '' })
+  }, [user])
+
+  async function saveProfile(event) {
+    event.preventDefault()
+    setError('')
+    setSuccess('')
+    setSavingProfile(true)
+    try {
+      const result = await updateProfile(profileForm)
+      if (!result.ok) throw new Error(result.message)
+      setEditingProfile(false)
+      setSuccess('প্রোফাইল আপডেট হয়েছে।')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSavingProfile(false)
+    }
+  }
 
   async function accept(group) {
     setError('')
@@ -152,22 +176,52 @@ export default function DriverHome() {
 
         {tab === 'profile' && (
           <section className="app-card p-5">
-            <h2 className="text-lg font-bold mb-4">ড্রাইভার প্রোফাইল</h2>
-            <div className="space-y-3">
-              <div className="rounded-2xl bg-sky-50 border border-sky-100 p-3">
-                <p className="text-[10px] uppercase tracking-[0.14em] text-ink/60">নাম</p>
-                <p className="mt-1 font-bold text-lg">{user?.name}</p>
-              </div>
-              <div className="rounded-2xl bg-sky-50 border border-sky-100 p-3">
-                <p className="text-[10px] uppercase tracking-[0.14em] text-ink/60">যোগাযোগ</p>
-                <p className="mt-1 font-bold">{user?.phone}</p>
-                <p className="mt-1 text-xs text-ink/60">{user?.email}</p>
-              </div>
-              <div className="rounded-2xl bg-sky-50 border border-sky-100 p-3">
-                <p className="text-[10px] uppercase tracking-[0.14em] text-ink/60">যাচাইয়ের অবস্থা</p>
-                <p className="mt-1 font-bold">{user?.verificationStatus || 'pending'}</p>
-              </div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold">ড্রাইভার প্রোফাইল</h2>
+              {!editingProfile && <button onClick={() => setEditingProfile(true)} className="secondary-btn px-4 py-2 text-xs">এডিট</button>}
             </div>
+            {!editingProfile ? (
+              <div className="space-y-3">
+                <div className="rounded-2xl bg-sky-50 border border-sky-100 p-3">
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-ink/60">নাম</p>
+                  <p className="mt-1 font-bold text-lg">{user?.name || '—'}</p>
+                </div>
+                <div className="rounded-2xl bg-sky-50 border border-sky-100 p-3">
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-ink/60">মোবাইল নম্বর</p>
+                  <p className="mt-1 font-bold">{user?.phone || '—'}</p>
+                </div>
+                <div className="rounded-2xl bg-sky-50 border border-sky-100 p-3">
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-ink/60">ইমেইল</p>
+                  <p className="mt-1 font-bold">{user?.email || '—'}</p>
+                </div>
+                <div className="rounded-2xl bg-sky-50 border border-sky-100 p-3">
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-ink/60">NID</p>
+                  <p className="mt-1 font-bold">•••• {user?.nidLast4 || 'সংরক্ষিত'}</p>
+                  <p className="mt-1 text-xs text-ink/60">নিরাপত্তার জন্য সম্পূর্ণ NID দেখানো বা সম্পাদনা করা যায় না।</p>
+                </div>
+                <div className="rounded-2xl bg-sky-50 border border-sky-100 p-3">
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-ink/60">যাচাইয়ের অবস্থা</p>
+                  <p className="mt-1 font-bold">{user?.verificationStatus || 'pending'}</p>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={saveProfile} className="space-y-3">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-[0.14em] text-ink/60">পুরো নাম</label>
+                  <input required minLength={2} maxLength={80} value={profileForm.name} onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })} className="mt-1 w-full rounded-2xl border border-sky-100 bg-sky-50 px-3 py-3 text-ink" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-[0.14em] text-ink/60">মোবাইল নম্বর</label>
+                  <input required inputMode="tel" maxLength={11} value={profileForm.phone} onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })} placeholder="01XXXXXXXXX" className="mt-1 w-full rounded-2xl border border-sky-100 bg-sky-50 px-3 py-3 text-ink" />
+                  <p className="mt-1 text-xs text-ink/60">বাংলাদেশি ১১ সংখ্যার মোবাইল নম্বর দিন।</p>
+                </div>
+                <p className="rounded-xl bg-slate-50 border border-slate-100 p-3 text-xs text-ink/60">ইমেইল ও NID নিরাপত্তা এবং যাচাইয়ের কারণে এখানে পরিবর্তন করা যাবে না।</p>
+                <div className="flex gap-2 pt-2">
+                  <button type="button" onClick={() => { setEditingProfile(false); setProfileForm({ name: user?.name || '', phone: user?.phone || '' }) }} className="secondary-btn flex-1 px-4 py-3 text-xs">বাতিল</button>
+                  <button type="submit" disabled={savingProfile} className="primary-btn flex-1 px-4 py-3 text-xs">{savingProfile ? 'সংরক্ষণ হচ্ছে…' : 'সংরক্ষণ করুন'}</button>
+                </div>
+              </form>
+            )}
           </section>
         )}
       </main>
