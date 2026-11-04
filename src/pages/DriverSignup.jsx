@@ -24,7 +24,7 @@ export default function DriverSignup() {
     setError('')
     if (!form.name.trim()) return setError('নাম লিখুন')
     const val = form.identifier.trim()
-    if (!GMAIL.test(val) && !PHONE.test(val)) {
+    if (googleCredential && !GMAIL.test(val)) return setError('Enter the same Gmail address you selected with Google.')\n    if (!GMAIL.test(val) && !PHONE.test(val)) {
       return setError('জিমেইল অথবা সঠিক মোবাইল নম্বর দিন (যেমন 017XXXXXXXX)')
     }
     if (!/^\d{10}$|^\d{13}$|^\d{17}$/.test(form.nid.trim())) {
@@ -35,7 +35,7 @@ export default function DriverSignup() {
     setBusy(true)
     const res = googleCredential
       ? await googleAuth(googleCredential, 'driver', 'signup', {
-          name: form.name, nid: form.nid.trim(), rickshaw: form.rickshaw,
+          name: form.name, identifier: val.toLowerCase(), nid: form.nid.trim(), rickshaw: form.rickshaw,
         })
       : await driverSignup({
           name: form.name, identifier: val.toLowerCase(), nid: form.nid.trim(),
