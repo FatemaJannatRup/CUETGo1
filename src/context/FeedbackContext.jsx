@@ -5,8 +5,9 @@ const FeedbackContext = createContext(() => {})
 export function FeedbackProvider({ children }) {
   const [feedback, setFeedback] = useState(null)
   const notify = useCallback((message, type = 'info', duration = 2800) => {
-    setFeedback({ message, type, id: Date.now() })
-    if (duration > 0) window.setTimeout(() => setFeedback(current => current?.message === message ? null : current), duration)
+    const id = Date.now() + Math.random()
+    setFeedback({ message, type, id })
+    if (duration > 0) window.setTimeout(() => setFeedback(current => current?.id === id ? null : current), duration)
   }, [])
   return <FeedbackContext.Provider value={notify}>
     {children}
