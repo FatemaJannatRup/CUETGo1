@@ -90,15 +90,17 @@ export default function DriverSignup() {
             onChange={(e) => update('rickshaw', e.target.value)}
           />
         </Field>
-        {!googleCredential && <Field label="পাসওয়ার্ড">
-          <input
-            className={inputClass}
-            type="password"
-            placeholder="কমপক্ষে ৬ অক্ষর"
-            value={form.password}
-            onChange={(e) => update('password', e.target.value)}
-          />
-        </Field>
+        {!googleCredential && (
+          <Field label="পাসওয়ার্ড">
+            <input
+              className={inputClass}
+              type="password"
+              placeholder="কমপক্ষে ৬ অক্ষর"
+              value={form.password}
+              onChange={(e) => update('password', e.target.value)}
+            />
+          </Field>
+        )}
 
         {error && <p className="text-rose-500 text-sm mb-3">{error}</p>}
 
