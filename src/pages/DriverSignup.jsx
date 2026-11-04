@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import Field, { inputClass } from '../components/Field.jsx'
+import GoogleAuthButton from '../components/GoogleAuthButton.jsx'
 
 const GMAIL = /^[a-zA-Z0-9._%+-]+@gmail\.com$/
 const PHONE = /^01[3-9]\d{8}$/
@@ -10,7 +11,8 @@ export default function DriverSignup() {
   const [form, setForm] = useState({ name: '', identifier: '', nid: '', rickshaw: '', password: '' })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const { driverSignup } = useAuth()
+  const [googleCredential, setGoogleCredential] = useState('')
+  const { driverSignup, googleAuth } = useAuth()
   const navigate = useNavigate()
 
   function update(key, value) {
@@ -28,16 +30,17 @@ export default function DriverSignup() {
     if (!/^\d{10}$|^\d{13}$|^\d{17}$/.test(form.nid.trim())) {
       return setError('সঠিক এনআইডি নম্বর দিন (যাচাইয়ের জন্য প্রয়োজন)')
     }
-    if (form.password.length < 6) return setError('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে')
+    if (!googleCredential && form.password.length < 6) return setError('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে')
 
     setBusy(true)
-    const res = await driverSignup({
-      name: form.name,
-      identifier: val.toLowerCase(),
-      nid: form.nid.trim(),
-      rickshaw: form.rickshaw,
-      password: form.password,
-    })
+    const res = googleCredential
+      ? await googleAuth(googleCredential, 'driver', 'signup', {
+          name: form.name, nid: form.nid.trim(), rickshaw: form.rickshaw,
+        })
+      : await driverSignup({
+          name: form.name, identifier: val.toLowerCase(), nid: form.nid.trim(),
+          rickshaw: form.rickshaw, password: form.password,
+        })
     setBusy(false)
     if (!res.ok) return setError(res.message)
     navigate('/driver/home')
@@ -51,6 +54,8 @@ export default function DriverSignup() {
       <h1 className="font-display text-2xl text-ink mb-1">চালক অ্যাকাউন্ট খুলুন</h1>
       <p className="text-ink/60 text-sm mb-8">নিরাপত্তার জন্য এনআইডি যাচাই আবশ্যক</p>
 
+      <GoogleAuthButton text="signup_with" onSuccess={setGoogleCredential} onError={setError} />
+      {googleCredential && <p className="text-center text-xs text-green-700 mb-3">Google account verified. Complete your NID details below.</p>}
       <form onSubmit={handleSubmit} className="flex-1 flex flex-col">
         <Field label="পুরো নাম">
           <input
@@ -84,7 +89,7 @@ export default function DriverSignup() {
             onChange={(e) => update('rickshaw', e.target.value)}
           />
         </Field>
-        <Field label="পাসওয়ার্ড">
+        {!googleCredential && <Field label="পাসওয়ার্ড">
           <input
             className={inputClass}
             type="password"
