@@ -43,8 +43,8 @@ export default function Admin() {
       setRides(rideData.rides)
       return true
     } catch (e) {
-      return false
       setError(e.message)
+      return false
       if (/session|logged|token|unauthorized/i.test(e.message)) logout()
     } finally {
       setLoading(false)
