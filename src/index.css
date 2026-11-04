@@ -378,3 +378,48 @@ body { background:#edf4f8; color:var(--ink); }
   .admin-login-card { padding:27px 22px; }
   .admin-back { top:18px; left:20px; }
 }
+
+
+/* Admin portal: keep the same compact, phone-first CUETGo proportions. */
+.phone-screen:has(.admin-page) {
+  width: 100%;
+  max-width: 520px;
+  min-height: min(920px, 94vh);
+  height: auto;
+  max-height: none;
+  overflow: hidden;
+  border-radius: 28px;
+}
+.phone-screen:has(.admin-page) .screen-scroll { overflow-y: auto; }
+.admin-page { width: 100%; min-width: 0; overflow-x: hidden; background: #f4f8fa; }
+.admin-header { padding: 20px 22px; }
+.admin-main { width: 100%; max-width: 520px; padding: 22px 18px 26px; }
+.admin-header-actions { flex-wrap: wrap; }
+.admin-header-actions span { overflow-wrap: anywhere; }
+.admin-tabs { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.admin-tabs button { min-width: 0; padding: 10px 5px; }
+.admin-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.admin-table-wrap { max-width: 100%; border-radius: 12px; }
+.admin-table-wrap table { min-width: 720px; }
+.admin-login-page { min-height: 100%; padding: 76px 18px 28px; }
+.admin-login-card { width: min(100%, 390px); padding: 28px 22px; }
+.admin-back { top: 22px; left: 20px; }
+@media (max-width: 600px) {
+  .phone-shell { padding: 0; }
+  .phone-screen:has(.admin-page) {
+    width: 100%;
+    max-width: 100%;
+    min-height: 100vh;
+    height: 100vh;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .admin-header { padding: 17px 17px; }
+  .admin-main { padding: 20px 14px 24px; }
+  .admin-panel { padding: 14px; }
+  .admin-tabs { position: sticky; top: 0; z-index: 5; }
+  .admin-stat { min-width: 0; }
+  .admin-stat strong { font-size: 23px; }
+  .admin-login-card { padding: 25px 20px; }
+}
