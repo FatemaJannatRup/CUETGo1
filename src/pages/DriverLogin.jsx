@@ -2,18 +2,22 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import GoogleAuthButton from '../components/GoogleAuthButton.jsx'
+import { useFeedback } from '../context/FeedbackContext.jsx'
 
 export default function DriverLogin() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const { googleLogin } = useAuth()
+  const notify = useFeedback()
   const navigate = useNavigate()
   async function handleGoogle(credential) {
     if (busy) return
     setError(''); setBusy(true)
+    notify('লগইন করা হচ্ছে…', 'loading', 0)
     const result = await googleLogin(credential, 'driver')
     setBusy(false)
-    if (!result.ok) return setError(result.message)
+    if (!result.ok) { notify(result.message, 'error'); return setError(result.message) }
+    notify('সফলভাবে লগইন হয়েছে।', 'success')
     navigate('/driver/home', { replace: true })
   }
   return <div className="auth-page bn">
