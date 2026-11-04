@@ -171,6 +171,25 @@ router.post('/google/login', async (req, res) => {
   }
 })
 
+router.patch('/admin/drivers/:id/approve', (req, res) => {
+  const expected = process.env.ADMIN_APPROVAL_KEY || ''
+  const supplied = req.get('x-admin-key') || ''
+  const expectedBuffer = Buffer.from(expected)
+  const suppliedBuffer = Buffer.from(supplied)
+  if (expectedBuffer.length < 32 || expectedBuffer.length !== suppliedBuffer.length ||
+      !crypto.timingSafeEqual(expectedBuffer, suppliedBuffer)) {
+    return res.status(403).json({ message: 'Administrator authorization failed.' })
+  }
+  const db = readDb()
+  const driver = db.drivers.find((item) => item.id === req.params.id)
+  if (!driver) return res.status(404).json({ message: 'Driver account not found.' })
+  driver.verificationStatus = 'approved'
+  driver.verified = true
+  driver.approvedAt = new Date().toISOString()
+  writeDb(db)
+  return res.json({ approved: true, driver: publicDriver(driver) })
+})
+
 router.get('/me', requireAuth(), (req, res) => {
   const db = readDb()
   if (req.user.role === 'student') {
