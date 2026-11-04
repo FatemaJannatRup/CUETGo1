@@ -473,3 +473,10 @@ button:active { transform: scale(.985); }
     transition-duration: .01ms !important;
   }
 }
+
+
+/* App-wide action feedback: one calm, consistent toast for every screen */
+.cuetgo-feedback{position:fixed;z-index:9999;top:max(18px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);width:min(390px,calc(100vw - 32px));min-height:54px;padding:13px 17px;display:flex;align-items:center;gap:11px;border:1px solid rgba(255,255,255,.78);border-radius:15px;background:rgba(255,255,255,.96);box-shadow:0 14px 42px rgba(17,49,70,.18);backdrop-filter:blur(16px);color:#17394e;font:650 13px/1.4 Inter,"Segoe UI",sans-serif;animation:cuetgo-toast-in .24s cubic-bezier(.2,.8,.2,1) both}
+.cuetgo-feedback-loading{border-color:#cfe6f2}.cuetgo-feedback-success{border-color:#c8eadb}.cuetgo-feedback-error{border-color:#f2d1d5;color:#9f3345}.cuetgo-feedback-icon{width:23px;height:23px;flex:0 0 23px;display:grid;place-items:center;border-radius:50%;background:#eaf4f8;color:#26769d;font-weight:900}.cuetgo-feedback-success .cuetgo-feedback-icon{background:#e6f6ed;color:#188454}.cuetgo-feedback-error .cuetgo-feedback-icon{background:#fff0f1;color:#c33f53}.cuetgo-feedback-spinner{width:19px;height:19px;flex:0 0 19px;border:2px solid #d8eaf2;border-top-color:#2d83ad;border-radius:50%;animation:cuetgo-spin .7s linear infinite}
+@keyframes cuetgo-toast-in{from{opacity:0;transform:translate(-50%,-9px) scale(.98)}to{opacity:1;transform:translate(-50%,0) scale(1)}}@keyframes cuetgo-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.cuetgo-feedback,.cuetgo-feedback-spinner{animation:none}}
