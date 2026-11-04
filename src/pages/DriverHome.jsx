@@ -56,8 +56,8 @@ export default function DriverHome() {
   }
 
   return (
-    <div className="bn h-full min-h-full flex flex-col bg-cream text-ink">
-      <header className="bg-gradient-to-br from-sky-500 via-sky-400 to-sky-600 text-ink px-6 pt-10 pb-6 rounded-b-[30px] shadow-soft">
+    <div className="app-dashboard bn h-full min-h-full flex flex-col bg-cream text-ink">
+      <header className="app-header bg-gradient-to-br from-sky-500 via-sky-400 to-sky-600 text-ink px-6 pt-10 pb-6 rounded-b-[30px] shadow-soft">
         <div className="flex justify-between items-start">
           <div>
             <p className="text-ink/70 text-xs uppercase tracking-[0.2em]">ড্রাইভার ড্যাশবোর্ড</p>
@@ -69,17 +69,18 @@ export default function DriverHome() {
         <div className="mt-5 flex items-center justify-between rounded-2xl bg-white/30 backdrop-blur-sm border border-white/40 px-3 py-2 shadow-soft">
           <div>
             <p className="text-[10px] uppercase tracking-[0.18em] text-ink/70">সময়সূচি</p>
-            <p className="text-xl font-bold">{rides.filter((ride) => ride.status === 'accepted').length} সক্রিয় যাত্রা</p>
+            <p className="text-xl font-bold">{user?.verificationStatus === 'approved' ? `${rides.filter((ride) => ride.status === 'accepted').length} সক্রিয় যাত্রা` : 'যাচাই অপেক্ষমাণ'}</p>
           </div>
           <span className="metric-pill">🚕 সক্রিয়</span>
         </div>
       </header>
 
-      <main className="flex-1 px-5 py-5 overflow-y-auto">
+      <main className="app-main flex-1 px-5 py-5 overflow-y-auto">
+        {user?.verificationStatus !== 'approved' && <div className="mb-4 rounded-2xl bg-amber-50 border border-amber-200 px-3 py-3 text-sm text-amber-800">আপনার Gmail যাচাই হয়েছে। NID ও চালকের তথ্য প্রশাসকের অনুমোদনের অপেক্ষায় আছে। অনুমোদনের পর যাত্রার অনুরোধ গ্রহণ করতে পারবেন।</div>}
         {error && <div className="mb-4 rounded-2xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{error}</div>}
         {success && <div className="mb-4 rounded-2xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-sm text-emerald-700">{success}</div>}
 
-        <div className="flex gap-2 mb-5">
+        <div className="app-tabs flex gap-2 mb-5">
           {['requests', 'active', 'profile'].map((value) => (
             <button
               key={value}
@@ -159,11 +160,12 @@ export default function DriverHome() {
               </div>
               <div className="rounded-2xl bg-sky-50 border border-sky-100 p-3">
                 <p className="text-[10px] uppercase tracking-[0.14em] text-ink/60">যোগাযোগ</p>
-                <p className="mt-1 font-bold">{user?.identifier}</p>
+                <p className="mt-1 font-bold">{user?.phone}</p>
+                <p className="mt-1 text-xs text-ink/60">{user?.email}</p>
               </div>
               <div className="rounded-2xl bg-sky-50 border border-sky-100 p-3">
-                <p className="text-[10px] uppercase tracking-[0.14em] text-ink/60">রিকশা</p>
-                <p className="mt-1 font-bold">{user?.rickshaw || 'এখনো যোগ করা হয়নি'}</p>
+                <p className="text-[10px] uppercase tracking-[0.14em] text-ink/60">যাচাইয়ের অবস্থা</p>
+                <p className="mt-1 font-bold">{user?.verificationStatus || 'pending'}</p>
               </div>
             </div>
           </section>

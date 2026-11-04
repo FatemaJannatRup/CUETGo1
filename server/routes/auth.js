@@ -1,139 +1,194 @@
 import { Router } from 'express'
-import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
+import { OAuth2Client } from 'google-auth-library'
 import { readDb, writeDb } from '../db.js'
 import { signToken, requireAuth } from '../middleware/auth.js'
 
 const router = Router()
-
-const CUET_EMAIL = /^u\d{7}@student\.cuet\.ac\.bd$/i
-const STUDENT_ID = /^\d{7}$/
-const GENDERS = ['male', 'female', 'unknown']
-const GMAIL = /^[a-zA-Z0-9._%+-]+@gmail\.com$/
+const CUET_EMAIL = /^(u\d{7})@student\.cuet\.ac\.bd$/i
+const GMAIL = /^[a-z0-9._%+-]+@gmail\.com$/i
 const PHONE = /^01[3-9]\d{8}$/
-const NID = /^\d{10}$|^\d{13}$|^\d{17}$/
+const NID = /^(\d{10}|\d{13}|\d{17})$/
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
 
-function publicStudent(s) {
-  const { password, ...rest } = s
-  return { ...rest, role: 'student' }
+function publicStudent(student) {
+  const { password, googleId, ...safe } = student
+  return { ...safe, name: safe.username, role: 'student' }
 }
-function publicDriver(d) {
-  const { password, ...rest } = d
-  return { ...rest, role: 'driver' }
+function publicDriver(driver) {
+  const { password, googleId, nid, nidHash, ...safe } = driver
+  return { ...safe, identifier: safe.phone, role: 'driver' }
+}
+function hashNid(value) {
+  const key = process.env.NID_HASH_SECRET || process.env.JWT_SECRET
+  return crypto.createHmac('sha256', key).update(String(value)).digest('hex')
+}
+function normalize(value) {
+  return String(value || '').trim().toLowerCase()
+}
+function uniqueGoogleId(db, googleId) {
+  return db.students.some((s) => s.googleId === googleId) ||
+    db.drivers.some((d) => d.googleId === googleId)
 }
 
-// ---------- STUDENT ----------
+async function verifiedGoogleUser(credential) {
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    const error = new Error('Google sign-in is not configured on the server.')
+    error.status = 503
+    throw error
+  }
+  if (!credential) {
+    const error = new Error('Complete Google verification first.')
+    error.status = 400
+    throw error
+  }
+  const ticket = await googleClient.verifyIdToken({
+    idToken: credential,
+    audience: process.env.GOOGLE_CLIENT_ID,
+  })
+  const user = ticket.getPayload()
+  if (!user?.sub || !user.email || user.email_verified !== true) {
+    const error = new Error('Google did not provide a verified email address.')
+    error.status = 401
+    throw error
+  }
+  return { googleId: user.sub, email: normalize(user.email), googleName: String(user.name || '').trim() }
+}
 
-router.post('/student/signup', async (req, res) => {
-  const { name, email, studentId, gender, hall, password } = req.body || {}
-  if (!name || !name.trim()) return res.status(400).json({ message: 'Enter your full name.' })
-  if (!CUET_EMAIL.test(email || '')) {
-    return res.status(400).json({ message: 'Use your CUET student email, e.g. u2204064@student.cuet.ac.bd' })
-  }
-  if (!STUDENT_ID.test(studentId || '')) {
-    return res.status(400).json({ message: 'Enter your 7-digit student ID, e.g. 2204064' })
-  }
-  if (!GENDERS.includes(gender)) {
-    return res.status(400).json({ message: 'Select your gender.' })
-  }
-  if (!password || password.length < 6) {
-    return res.status(400).json({ message: 'Password must be at least 6 characters.' })
-  }
+function issueSession(res, account, role) {
+  const token = signToken({ id: account.id, role })
+  return res.json({ token, user: role === 'student' ? publicStudent(account) : publicDriver(account) })
+}
 
+router.post('/google/signup', async (req, res) => {
+  try {
+    const { credential, role, profile = {} } = req.body || {}
+    if (!['student', 'driver'].includes(role)) {
+      return res.status(400).json({ message: 'Choose a valid account type.' })
+    }
+    const google = await verifiedGoogleUser(credential)
+    const db = readDb()
+
+    if (uniqueGoogleId(db, google.googleId)) {
+      return res.status(409).json({ message: 'This Google account is already registered. Please log in.' })
+    }
+
+    let account
+    if (role === 'student') {
+      const match = google.email.match(CUET_EMAIL)
+      if (!match) return res.status(403).json({ message: 'Students must use their verified CUET student Google account.' })
+      const username = String(profile.username || '').trim()
+      if (username.length < 3 || username.length > 24 || !/^[a-zA-Z0-9_.-]+$/.test(username)) {
+        return res.status(400).json({ message: 'Username must be 3–24 characters and contain only letters, numbers, dots, underscores or hyphens.' })
+      }
+      if (db.students.some((s) => normalize(s.username) === normalize(username))) {
+        return res.status(409).json({ message: 'That username is already taken. Choose another one.' })
+      }
+      if (db.students.some((s) => normalize(s.email) === google.email)) {
+        return res.status(409).json({ message: 'An account already exists for this CUET email. Please contact support to link it safely.' })
+      }
+      account = {
+        id: crypto.randomUUID(),
+        username,
+        name: username,
+        email: google.email,
+        studentId: match[1].slice(1),
+        googleId: google.googleId,
+        authProvider: 'google',
+        createdAt: new Date().toISOString(),
+      }
+      db.students.push(account)
+    } else {
+      if (!GMAIL.test(google.email)) {
+        return res.status(403).json({ message: 'Drivers must use a verified personal Gmail account.' })
+      }
+      const name = String(profile.name || '').trim()
+      const nid = String(profile.nid || '').trim()
+      const phone = String(profile.phone || '').trim()
+      if (name.length < 2 || name.length > 80) return res.status(400).json({ message: 'Enter your full name.' })
+      if (!NID.test(nid)) return res.status(400).json({ message: 'Enter a valid 10, 13 or 17-digit NID number.' })
+      if (!PHONE.test(phone)) return res.status(400).json({ message: 'Enter a valid Bangladeshi mobile number, e.g. 017XXXXXXXX.' })
+      if (db.drivers.some((d) => normalize(d.email) === google.email)) return res.status(409).json({ message: 'A driver account already exists for this Gmail. Please log in.' })
+      const nidHash = hashNid(nid)
+      if (db.drivers.some((d) => d.nidHash === nidHash || (!d.nidHash && String(d.nid || '') === nid))) return res.status(409).json({ message: 'This NID is already associated with an account.' })
+      if (db.drivers.some((d) => String(d.phone || '') === phone)) return res.status(409).json({ message: 'This phone number is already associated with an account.' })
+      account = {
+        id: crypto.randomUUID(),
+        name,
+        nidHash,
+        nidLast4: nid.slice(-4),
+        phone,
+        identifier: phone,
+        email: google.email,
+        googleId: google.googleId,
+        authProvider: 'google',
+        verificationStatus: 'pending',
+        verified: false,
+        createdAt: new Date().toISOString(),
+      }
+      db.drivers.push(account)
+    }
+
+    writeDb(db)
+    return issueSession(res, account, role)
+  } catch (error) {
+    console.error('Google signup failed:', error.message)
+    return res.status(error.status || 401).json({ message: error.status ? error.message : 'Google verification failed. Please try again.' })
+  }
+})
+
+router.post('/google/login', async (req, res) => {
+  try {
+    const { credential, role } = req.body || {}
+    if (!['student', 'driver'].includes(role)) return res.status(400).json({ message: 'Choose a valid account type.' })
+    const google = await verifiedGoogleUser(credential)
+    if (role === 'student' && !CUET_EMAIL.test(google.email)) {
+      return res.status(403).json({ message: 'Students must use their verified CUET student Google account.' })
+    }
+    if (role === 'driver' && !GMAIL.test(google.email)) {
+      return res.status(403).json({ message: 'Drivers must use a verified personal Gmail account.' })
+    }
+
+    const db = readDb()
+    const account = role === 'student'
+      ? db.students.find((s) => s.googleId === google.googleId)
+      : db.drivers.find((d) => d.googleId === google.googleId)
+
+    if (!account) {
+      const emailExists = role === 'student'
+        ? db.students.some((s) => normalize(s.email) === google.email)
+        : db.drivers.some((d) => normalize(d.email) === google.email)
+      return res.status(emailExists ? 409 : 404).json({
+        message: emailExists
+          ? 'An older account exists for this email but is not linked to Google. Contact support to link it safely.'
+          : 'No account exists for this Google email. Please sign up first.',
+      })
+    }
+    return issueSession(res, account, role)
+  } catch (error) {
+    console.error('Google login failed:', error.message)
+    return res.status(error.status || 401).json({ message: error.status ? error.message : 'Google verification failed. Please try again.' })
+  }
+})
+
+router.patch('/admin/drivers/:id/approve', (req, res) => {
+  const expected = process.env.ADMIN_APPROVAL_KEY || ''
+  const supplied = req.get('x-admin-key') || ''
+  const expectedBuffer = Buffer.from(expected)
+  const suppliedBuffer = Buffer.from(supplied)
+  if (expectedBuffer.length < 32 || expectedBuffer.length !== suppliedBuffer.length ||
+      !crypto.timingSafeEqual(expectedBuffer, suppliedBuffer)) {
+    return res.status(403).json({ message: 'Administrator authorization failed.' })
+  }
   const db = readDb()
-  const emailLower = String(email || '').toLowerCase()
-  if (db.students.find((s) => s.email === emailLower)) {
-    return res.status(409).json({ message: 'An account with this email already exists.' })
-  }
-  if (db.students.find((s) => s.studentId === String(studentId))) {
-    return res.status(409).json({ message: 'An account with this student ID already exists.' })
-  }
-
-  const hashed = await bcrypt.hash(password, 10)
-  const student = {
-    id: crypto.randomUUID(),
-    name: name.trim(),
-    email: emailLower,
-    studentId: String(studentId),
-    gender,
-    hall: hall || '',
-    password: hashed,
-    createdAt: new Date().toISOString(),
-  }
-  db.students.push(student)
+  const driver = db.drivers.find((item) => item.id === req.params.id)
+  if (!driver) return res.status(404).json({ message: 'Driver account not found.' })
+  driver.verificationStatus = 'approved'
+  driver.verified = true
+  driver.approvedAt = new Date().toISOString()
   writeDb(db)
-
-  const token = signToken({ id: student.id, role: 'student' })
-  res.json({ token, user: publicStudent(student) })
+  return res.json({ approved: true, driver: publicDriver(driver) })
 })
-
-router.post('/student/login', async (req, res) => {
-  const { email, password } = req.body || {}
-  const db = readDb()
-  const student = db.students.find((s) => s.email === (email || '').toLowerCase())
-  if (!student) return res.status(401).json({ message: 'No account found with this email.' })
-
-  const match = await bcrypt.compare(password || '', student.password)
-  if (!match) return res.status(401).json({ message: 'Incorrect password.' })
-
-  const token = signToken({ id: student.id, role: 'student' })
-  res.json({ token, user: publicStudent(student) })
-})
-
-// ---------- DRIVER ----------
-
-router.post('/driver/signup', async (req, res) => {
-  const { name, identifier, nid, rickshaw, password } = req.body || {}
-  if (!name || !name.trim()) return res.status(400).json({ message: 'নাম লিখুন' })
-
-  const idLower = (identifier || '').trim().toLowerCase()
-  if (!GMAIL.test(idLower) && !PHONE.test(idLower)) {
-    return res.status(400).json({ message: 'জিমেইল অথবা সঠিক মোবাইল নম্বর দিন (যেমন 017XXXXXXXX)' })
-  }
-  if (!NID.test((nid || '').trim())) {
-    return res.status(400).json({ message: 'সঠিক এনআইডি নম্বর দিন (যাচাইয়ের জন্য প্রয়োজন)' })
-  }
-  if (!password || password.length < 6) {
-    return res.status(400).json({ message: 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে' })
-  }
-
-  const db = readDb()
-  if (db.drivers.find((d) => d.identifier === idLower)) {
-    return res.status(409).json({ message: 'এই তথ্য দিয়ে ইতিমধ্যে একটি অ্যাকাউন্ট আছে।' })
-  }
-
-  const hashed = await bcrypt.hash(password, 10)
-  const driver = {
-    id: crypto.randomUUID(),
-    name: name.trim(),
-    identifier: idLower,
-    nid: String(nid || '').trim(),
-    rickshaw: rickshaw || '',
-    verified: false,
-    password: hashed,
-    createdAt: new Date().toISOString(),
-  }
-  db.drivers.push(driver)
-  writeDb(db)
-
-  const token = signToken({ id: driver.id, role: 'driver' })
-  res.json({ token, user: publicDriver(driver) })
-})
-
-router.post('/driver/login', async (req, res) => {
-  const { identifier, password } = req.body || {}
-  const db = readDb()
-  const driver = db.drivers.find((d) => d.identifier === (identifier || '').trim().toLowerCase())
-  if (!driver) return res.status(401).json({ message: 'এই তথ্য দিয়ে কোনো অ্যাকাউন্ট পাওয়া যায়নি।' })
-
-  const match = await bcrypt.compare(password || '', driver.password)
-  if (!match) return res.status(401).json({ message: 'পাসওয়ার্ড সঠিক নয়।' })
-
-  const token = signToken({ id: driver.id, role: 'driver' })
-  res.json({ token, user: publicDriver(driver) })
-})
-
-// ---------- SESSION ----------
 
 router.get('/me', requireAuth(), (req, res) => {
   const db = readDb()
@@ -142,31 +197,39 @@ router.get('/me', requireAuth(), (req, res) => {
     if (!student) return res.status(404).json({ message: 'Account not found.' })
     return res.json({ user: publicStudent(student) })
   }
-  const driver = db.drivers.find((d) => d.id === req.user.id)
-  if (!driver) return res.status(404).json({ message: 'Account not found.' })
-  res.json({ user: publicDriver(driver) })
+  if (req.user.role === 'driver') {
+    const driver = db.drivers.find((d) => d.id === req.user.id)
+    if (!driver) return res.status(404).json({ message: 'Account not found.' })
+    return res.json({ user: publicDriver(driver) })
+  }
+  return res.status(403).json({ message: 'Invalid account role.' })
 })
 
 router.put('/profile', requireAuth(), (req, res) => {
   const db = readDb()
-  const { name, hall, gender } = req.body || {}
-
   if (req.user.role === 'student') {
     const student = db.students.find((s) => s.id === req.user.id)
     if (!student) return res.status(404).json({ message: 'Account not found.' })
-    student.name = String(name || student.name).trim()
-    student.hall = hall || student.hall || ''
-    student.gender = GENDERS.includes(gender) ? gender : student.gender
+    const username = String(req.body?.username || '').trim()
+    if (username && username !== student.username) {
+      if (username.length < 3 || username.length > 24 || !/^[a-zA-Z0-9_.-]+$/.test(username)) {
+        return res.status(400).json({ message: 'Username must be 3–24 valid characters.' })
+      }
+      if (db.students.some((s) => s.id !== student.id && normalize(s.username) === normalize(username))) {
+        return res.status(409).json({ message: 'That username is already taken.' })
+      }
+      student.username = username
+      student.name = username
+    }
     writeDb(db)
     return res.json({ user: publicStudent(student) })
   }
-
-  const driver = db.drivers.find((d) => d.id === req.user.id)
-  if (!driver) return res.status(404).json({ message: 'Account not found.' })
-  driver.name = String(name || driver.name).trim()
-  driver.rickshaw = String(req.body?.rickshaw || driver.rickshaw || '')
-  writeDb(db)
-  res.json({ user: publicDriver(driver) })
+  if (req.user.role === 'driver') {
+    const driver = db.drivers.find((d) => d.id === req.user.id)
+    if (!driver) return res.status(404).json({ message: 'Account not found.' })
+    return res.json({ user: publicDriver(driver) })
+  }
+  return res.status(403).json({ message: 'Invalid account role.' })
 })
 
 export default router

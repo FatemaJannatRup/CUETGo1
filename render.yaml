@@ -15,6 +15,10 @@ services:
         value: production
       - key: JWT_SECRET
         generateValue: true
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: ADMIN_APPROVAL_KEY
+        sync: false
       - key: GEMINI_API_KEY
         sync: false
 
@@ -28,6 +32,8 @@ services:
     buildCommand: npm install && npm run build
     staticPublishPath: dist
     envVars:
+      - key: VITE_GOOGLE_CLIENT_ID
+        sync: false
       - key: VITE_API_URL
         fromService:
           name: cuetgo-backend

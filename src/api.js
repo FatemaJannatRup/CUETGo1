@@ -3,58 +3,36 @@ const isLocalNetworkHost = ['localhost', '127.0.0.1', '::1'].includes(window.loc
   || window.location.hostname.startsWith('192.168.')
   || window.location.hostname.startsWith('172.')
 
-// In production (Render), VITE_API_URL will be the backend base URL
-// We automatically append /api if it is missing
 function getApiBase() {
-  if (isLocalNetworkHost) {
-    return `http://${window.location.hostname}:5000/api`
-  }
-
+  if (isLocalNetworkHost) return `http://${window.location.hostname}:5000/api`
   const envUrl = import.meta.env.VITE_API_URL
-  if (!envUrl) {
-    return 'https://gonad-humped-rockiness.ngrok-free.dev/api' // fallback
-  }
-
-  // Make sure it ends with /api
+  if (!envUrl) return ''
   return envUrl.endsWith('/api') ? envUrl : `${envUrl.replace(/\/$/, '')}/api`
 }
 
 const API_BASE = getApiBase()
-
-function getToken() {
-  return localStorage.getItem('csr_token')
-}
+function getToken() { return localStorage.getItem('csr_token') }
 
 async function request(path, { method = 'GET', body, auth = false } = {}) {
   const headers = {}
-
-  if (body) {
-    headers['Content-Type'] = 'application/json'
-  }
+  if (body) headers['Content-Type'] = 'application/json'
   if (auth) {
     const token = getToken()
     if (token) headers.Authorization = `Bearer ${token}`
   }
   const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
+    method, headers, body: body ? JSON.stringify(body) : undefined,
   })
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) {
-    throw new Error(data.message || 'Something went wrong. Please try again.')
-  }
+  if (!res.ok) throw new Error(data.message || 'Something went wrong. Please try again.')
   return data
 }
 
 export const api = {
-  studentSignup: (payload) => request('/auth/student/signup', { method: 'POST', body: payload }),
-  studentLogin: (payload) => request('/auth/student/login', { method: 'POST', body: payload }),
-  driverSignup: (payload) => request('/auth/driver/signup', { method: 'POST', body: payload }),
-  driverLogin: (payload) => request('/auth/driver/login', { method: 'POST', body: payload }),
+  googleSignup: (payload) => request('/auth/google/signup', { method: 'POST', body: payload }),
+  googleLogin: (payload) => request('/auth/google/login', { method: 'POST', body: payload }),
   me: () => request('/auth/me', { auth: true }),
   updateProfile: (payload) => request('/auth/profile', { method: 'PUT', body: payload, auth: true }),
-
   routes: () => request('/rides/routes'),
   requestRide: (payload) => request('/rides/request', { method: 'POST', body: payload, auth: true }),
   openRides: () => request('/rides/open', { auth: true }),
@@ -65,5 +43,4 @@ export const api = {
   completeRide: (id) => request(`/rides/${id}/complete`, { method: 'POST', auth: true }),
   myDriverRides: () => request('/rides/mine-driver', { auth: true }),
 }
-
 export { getToken }

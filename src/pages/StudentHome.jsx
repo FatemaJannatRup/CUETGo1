@@ -24,7 +24,7 @@ export default function StudentHome() {
   const [success, setSuccess] = useState('')
   const [joiningId, setJoiningId] = useState(null)
   const [editingProfile, setEditingProfile] = useState(false)
-  const [profileForm, setProfileForm] = useState({ name: user?.name || '', hall: user?.hall || '', gender: user?.gender || '' })
+  const [profileForm, setProfileForm] = useState({ username: user?.username || user?.name || '' })
   const [savingProfile, setSavingProfile] = useState(false)
   const [calendarDays] = useState(() => Array.from({ length: 7 }, (_, idx) => {
     const date = new Date(); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() + idx)
@@ -46,7 +46,7 @@ export default function StudentHome() {
   useEffect(() => {
     if (user) {
       setForm((prev) => ({ ...prev, from: prev.from || user.hall || '' }))
-      setProfileForm({ name: user.name || '', hall: user.hall || '', gender: user.gender || '' })
+      setProfileForm({ username: user.username || user.name || '' })
     }
   }, [user])
 
@@ -149,8 +149,8 @@ export default function StudentHome() {
   }
 
   return (
-    <div className="h-full min-h-full flex flex-col bg-cream text-ink">
-      <header className="bg-gradient-to-br from-sky-500 via-sky-400 to-sky-600 text-ink px-6 pt-10 pb-6 rounded-b-[30px] shadow-soft">
+    <div className="app-dashboard h-full min-h-full flex flex-col bg-cream text-ink">
+      <header className="app-header bg-gradient-to-br from-sky-500 via-sky-400 to-sky-600 text-ink px-6 pt-10 pb-6 rounded-b-[30px] shadow-soft">
         <div className="flex justify-between items-start">
           <div>
             <p className="text-ink/70 text-xs uppercase tracking-[0.2em]">Student Dashboard</p>
@@ -168,8 +168,8 @@ export default function StudentHome() {
         </div>
       </header>
 
-      <main className="flex-1 px-5 py-5 overflow-y-auto">
-        <div className="flex gap-2 mb-5">
+      <main className="app-main flex-1 px-5 py-5 overflow-y-auto">
+        <div className="app-tabs flex gap-2 mb-5">
           {['dashboard', 'rides', 'profile'].map((value) => (
             <button
               key={value}
@@ -365,8 +365,8 @@ export default function StudentHome() {
                 </div>
                 <div className="space-y-3">
                   <div className="rounded-2xl bg-sky-50 border border-sky-100 p-3">
-                    <p className="text-[10px] uppercase tracking-[0.14em] text-ink/60">Name</p>
-                    <p className="mt-1 font-bold text-lg">{user?.name}</p>
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-ink/60">Username</p>
+                    <p className="mt-1 font-bold text-lg">{user?.username || user?.name}</p>
                   </div>
                   <div className="rounded-2xl bg-sky-50 border border-sky-100 p-3">
                     <p className="text-[10px] uppercase tracking-[0.14em] text-ink/60">Email</p>
@@ -385,24 +385,8 @@ export default function StudentHome() {
             ) : (
               <form onSubmit={handleSaveProfile} className="space-y-3">
                 <div>
-                  <label className="text-xs font-bold uppercase tracking-[0.14em] text-ink/60">Name</label>
-                  <input value={profileForm.name} onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })} className="mt-1 w-full rounded-2xl border border-sky-100 bg-sky-50 px-3 py-3 text-ink" />
-                </div>
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-[0.14em] text-ink/60">Gender</label>
-                  <select value={profileForm.gender} onChange={(e) => setProfileForm({ ...profileForm, gender: e.target.value })} className="mt-1 w-full rounded-2xl border border-sky-100 bg-sky-50 px-3 py-3 text-ink">
-                    <option value="">Select gender</option>
-                    <option value="female">Female</option>
-                    <option value="male">Male</option>
-                    <option value="unknown">Prefer not to say</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-[0.14em] text-ink/60">Hall</label>
-                  <select value={profileForm.hall} onChange={(e) => setProfileForm({ ...profileForm, hall: e.target.value })} className="mt-1 w-full rounded-2xl border border-sky-100 bg-sky-50 px-3 py-3 text-ink">
-                    <option value="">Select hall</option>
-                    {HALLS.map((hall) => <option key={hall} value={hall}>{hall}</option>)}
-                  </select>
+                  <label className="text-xs font-bold uppercase tracking-[0.14em] text-ink/60">Username</label>
+                  <input value={profileForm.username} onChange={(e) => setProfileForm({ ...profileForm, username: e.target.value })} className="mt-1 w-full rounded-2xl border border-sky-100 bg-sky-50 px-3 py-3 text-ink" />
                 </div>
                 <div className="flex gap-2 pt-2">
                   <button type="button" onClick={() => setEditingProfile(false)} className="secondary-btn flex-1 px-4 py-3 text-xs uppercase tracking-[0.12em]">Cancel</button>
