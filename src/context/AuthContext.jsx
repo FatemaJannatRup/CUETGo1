@@ -31,7 +31,7 @@ export function AuthProvider({ children }) {
     setUser((current) => ({ ...(current || {}), ...(nextUser || {}) }))
   }
 
-  async function studentSignup(payload) {
+  async function googleAuth(credential, role, intent = 'login', profile = {}) {\n    try {\n      const { token, user } = await api.googleAuth({ credential, role, intent, profile })\n      persist(token, user)\n      return { ok: true }\n    } catch (e) {\n      return { ok: false, message: e.message }\n    }\n  }\n\n  async function studentSignup(payload) {
     try {
       const { token, user } = await api.studentSignup(payload)
       persist(token, user)
@@ -88,7 +88,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, studentSignup, studentLogin, driverSignup, driverLogin, updateProfile, updateUser, logout }}
+      value={{ user, loading, googleAuth, studentSignup, studentLogin, driverSignup, driverLogin, updateProfile, updateUser, logout }}
     >
       {children}
     </AuthContext.Provider>
