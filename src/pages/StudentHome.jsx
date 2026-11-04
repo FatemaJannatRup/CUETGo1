@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api.js'
+import { useFeedback } from '../context/FeedbackContext.jsx'
 
 const HALLS = ['Muktijoddha Hall', 'Shahid Mohammad Shah Hall', 'Dr. Qudrat-E-Khuda Hall', 'Kabi Kazi Nazrul Islam Hall', 'Shaheed Tareq Huda Hall', 'Shaheed Abu Sayed Hall', 'Sufia Kamal Hall', 'Begum Shamsunnahar Khan Hall', 'Tapashi Rabeya Hall']
 const formatTime = (value) => new Date(value).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })
@@ -15,6 +16,7 @@ function genderLabel(g) {
 
 export default function StudentHome() {
   const { user, logout, updateProfile } = useAuth()
+  const notify = useFeedback()
   const [locations, setLocations] = useState([])
   const [rides, setRides] = useState([])
   const [openRides, setOpenRides] = useState([])
@@ -92,6 +94,7 @@ export default function StudentHome() {
   const handleRequestRide = async (event) => {
     event.preventDefault()
     setBusy(true)
+    notify('Booking your ride…', 'loading', 0)
     setError('')
     setSuccess('')
 
@@ -101,6 +104,7 @@ export default function StudentHome() {
         requestedTime: form.requestedTime || new Date(selectedDay).toISOString(),
       }
       const result = await api.requestRide(payload)
+      notify('Ride booked successfully.', 'success')
       setSuccess(`Ride request created for ${payload.from} → ${payload.to}.`)
       setForm({ ...form, from: user?.hall || '', to: 'Academic Building', requestedTime: payload.requestedTime, seats: 1, coPassengerName: '', coPassengerPhone: '', coPassengerInfo: '' })
       await refreshData()
@@ -110,6 +114,7 @@ export default function StudentHome() {
         setSuccess(`Found ${result.matches.length} matching rider${result.matches.length > 1 ? 's' : ''}!`)
       }
     } catch (err) {
+      notify(err.message, 'error')
       setError(err.message)
     } finally {
       setBusy(false)
@@ -118,11 +123,13 @@ export default function StudentHome() {
 
   const handleJoinRide = async (ride) => {
     setJoiningId(ride.id)
+    notify('Joining ride…', 'loading', 0)
     setError('')
     setSuccess('')
     try {
       const payload = { seats: 1, phone: user?.phone || '', info: 'Joining this ride' }
       await api.joinRide(ride.id, payload)
+      notify('You joined the ride successfully.', 'success')
       setSuccess('You joined the ride successfully.')
       await refreshData()
     } catch (err) {
@@ -135,11 +142,13 @@ export default function StudentHome() {
   const handleSaveProfile = async (event) => {
     event.preventDefault()
     setSavingProfile(true)
+    notify('Saving profile changes…', 'loading', 0)
     setError('')
     try {
       const result = await updateProfile(profileForm)
       if (!result.ok) throw new Error(result.message)
       setEditingProfile(false)
+      notify('Profile updated successfully.', 'success')
       setSuccess('Profile updated.')
       setTimeout(() => setSuccess(''), 2400)
     } catch (err) {
@@ -157,7 +166,7 @@ export default function StudentHome() {
             <p className="text-ink/70 text-xs uppercase tracking-[0.2em]">Student Dashboard</p>
             <h1 className="text-2xl font-bold mt-2">{user?.name || 'Student'}</h1>
           </div>
-          <button onClick={logout} className="text-sm font-semibold text-ink/80 underline">Log out</button>
+          <button onClick={() => { notify('Logging out…', 'loading', 0); window.setTimeout(logout, 500) }} className="text-sm font-semibold text-ink/80 underline">Log out</button>
         </div>
 
         <div className="mt-5 flex items-center justify-between rounded-2xl bg-white/30 backdrop-blur-sm border border-white/40 px-3 py-2 shadow-soft">
