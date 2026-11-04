@@ -24,7 +24,7 @@ export default function StudentHome() {
   const [success, setSuccess] = useState('')
   const [joiningId, setJoiningId] = useState(null)
   const [editingProfile, setEditingProfile] = useState(false)
-  const [profileForm, setProfileForm] = useState({ username: user?.username || user?.name || '' })
+  const [profileForm, setProfileForm] = useState({ username: user?.username || user?.name || '', hall: user?.hall || '', gender: user?.gender || '' })
   const [savingProfile, setSavingProfile] = useState(false)
   const [calendarDays] = useState(() => Array.from({ length: 7 }, (_, idx) => {
     const date = new Date(); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() + idx)
@@ -46,7 +46,7 @@ export default function StudentHome() {
   useEffect(() => {
     if (user) {
       setForm((prev) => ({ ...prev, from: prev.from || user.hall || '' }))
-      setProfileForm({ username: user.username || user.name || '' })
+      setProfileForm({ username: user.username || user.name || '', hall: user.hall || '', gender: user.gender || '' })
     }
   }, [user])
 
@@ -380,13 +380,37 @@ export default function StudentHome() {
                     <p className="text-[10px] uppercase tracking-[0.14em] text-ink/60">Hall</p>
                     <p className="mt-1 font-bold">{user?.hall || 'Not set'}</p>
                   </div>
+                  <div className="rounded-2xl bg-sky-50 border border-sky-100 p-3">
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-ink/60">Gender</p>
+                    <p className="mt-1 font-bold">{genderLabel(user?.gender)}</p>
+                  </div>
                 </div>
               </>
             ) : (
               <form onSubmit={handleSaveProfile} className="space-y-3">
                 <div>
                   <label className="text-xs font-bold uppercase tracking-[0.14em] text-ink/60">Username</label>
-                  <input value={profileForm.username} onChange={(e) => setProfileForm({ ...profileForm, username: e.target.value })} className="mt-1 w-full rounded-2xl border border-sky-100 bg-sky-50 px-3 py-3 text-ink" />
+                  <input required minLength={3} maxLength={24} value={profileForm.username} onChange={(e) => setProfileForm({ ...profileForm, username: e.target.value })} className="mt-1 w-full rounded-2xl border border-sky-100 bg-sky-50 px-3 py-3 text-ink" />
+                  <p className="mt-1 text-xs text-ink/60">3–24 characters. Letters, numbers, dots, underscores and hyphens.</p>
+                </div>
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-[0.14em] text-ink/60">Hall</label>
+                  <select value={profileForm.hall} onChange={(e) => setProfileForm({ ...profileForm, hall: e.target.value })} className="mt-1 w-full rounded-2xl border border-sky-100 bg-sky-50 px-3 py-3 text-ink">
+                    <option value="">Not specified</option>
+                    {HALLS.map((hall) => <option key={hall} value={hall}>{hall}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-[0.14em] text-ink/60">Gender</label>
+                  <select value={profileForm.gender} onChange={(e) => setProfileForm({ ...profileForm, gender: e.target.value })} className="mt-1 w-full rounded-2xl border border-sky-100 bg-sky-50 px-3 py-3 text-ink">
+                    <option value="">Not specified</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="unknown">Prefer not to say</option>
+                  </select>
+                </div>
+                <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 text-xs text-ink/60">
+                  Your CUET email and Student ID are verified account details and cannot be changed here.
                 </div>
                 <div className="flex gap-2 pt-2">
                   <button type="button" onClick={() => setEditingProfile(false)} className="secondary-btn flex-1 px-4 py-3 text-xs uppercase tracking-[0.12em]">Cancel</button>
