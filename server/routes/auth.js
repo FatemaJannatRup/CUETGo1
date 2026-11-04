@@ -19,7 +19,7 @@ function publicDriver(driver) {
   const { password, ...safe } = driver
   return { ...safe, identifier: safe.phone, role: 'driver' }
 }
-function normalize(value) {
+function hashNid(value) {\n  const key = process.env.NID_HASH_SECRET || process.env.JWT_SECRET\n  return crypto.createHmac('sha256', key).update(String(value)).digest('hex')\n}\nfunction normalize(value) {
   return String(value || '').trim().toLowerCase()
 }
 function uniqueGoogleId(db, googleId) {
@@ -105,7 +105,7 @@ router.post('/google/signup', async (req, res) => {
       if (!NID.test(nid)) return res.status(400).json({ message: 'Enter a valid 10, 13 or 17-digit NID number.' })
       if (!PHONE.test(phone)) return res.status(400).json({ message: 'Enter a valid Bangladeshi mobile number, e.g. 017XXXXXXXX.' })
       if (db.drivers.some((d) => normalize(d.email) === google.email)) return res.status(409).json({ message: 'A driver account already exists for this Gmail. Please log in.' })
-      if (db.drivers.some((d) => String(d.nid || '') === nid)) return res.status(409).json({ message: 'This NID is already associated with an account.' })
+      const nidHash = hashNid(nid)\n      if (db.drivers.some((d) => d.nidHash === nidHash || (!d.nidHash && String(d.nid || '') === nid))) return res.status(409).json({ message: 'This NID is already associated with an account.' })
       if (db.drivers.some((d) => String(d.phone || '') === phone)) return res.status(409).json({ message: 'This phone number is already associated with an account.' })
       account = {
         id: crypto.randomUUID(),
