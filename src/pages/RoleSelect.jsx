@@ -2,45 +2,18 @@ import { useNavigate } from 'react-router-dom'
 
 export default function RoleSelect() {
   const navigate = useNavigate()
-
-  return (
-    <div className="h-full min-h-full flex flex-col justify-center gap-8 px-8 py-14 bg-cream">
-      <div className="text-center">
-        <h1 className="font-display text-2xl text-ink mb-2">I am a...</h1>
-        <p className="text-ink/60 text-sm">Choose how you'd like to continue</p>
-      </div>
-
-      <div className="flex flex-col gap-4">
-        <button
-          onClick={() => navigate('/student/login')}
-          className="bg-white border border-lilac-200 hover:border-lilac-400 rounded-xl2 p-5 text-left shadow-soft transition-colors"
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-lilac-100 flex items-center justify-center text-xl">
-              🎓
-            </div>
-            <div>
-              <p className="font-semibold text-ink">Student</p>
-              <p className="text-sm text-ink/60">Request and join shared rides</p>
-            </div>
-          </div>
-        </button>
-
-        <button
-          onClick={() => navigate('/driver/login')}
-          className="bg-white border border-lilac-200 hover:border-lilac-400 rounded-xl2 p-5 text-left shadow-soft transition-colors"
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-lilac-100 flex items-center justify-center text-xl">
-              🛺
-            </div>
-            <div>
-              <p className="font-semibold text-ink">Rickshaw Driver</p>
-              <p className="text-sm text-ink/60">রিকশাচালক — রাইড গ্রহণ করুন</p>
-            </div>
-          </div>
-        </button>
-      </div>
+  return <div className="role-page">
+    <button onClick={() => navigate('/')} className="auth-back">← Back</button>
+    <div className="auth-brand"><span className="auth-brand-mark">C</span><span>CUET<span className="auth-brand-accent">Go</span></span></div>
+    <div className="role-heading"><span className="auth-eyebrow">LET'S GET YOU MOVING</span><h1>How will you<br/>use CUETGo?</h1><p>Choose your account type to continue.</p></div>
+    <div className="role-options">
+      <button onClick={() => navigate('/student/login')} className="role-card">
+        <span className="role-icon">🎓</span><span className="role-copy"><strong>I'm a student</strong><small>Find a ride, share the fare, and travel together.</small></span><span className="role-arrow">→</span>
+      </button>
+      <button onClick={() => navigate('/driver/login')} className="role-card">
+        <span className="role-icon driver-role-icon">🛺</span><span className="role-copy"><strong>I'm a rickshaw driver</strong><small>View ride requests and manage your trips.</small></span><span className="role-arrow">→</span>
+      </button>
     </div>
-  )
+    <p className="role-footnote">Already have an account? Choose your role to sign in.</p>
+  </div>
 }
