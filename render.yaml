@@ -24,7 +24,6 @@ services:
   - type: web
     name: cuetgo-frontend
     runtime: static
-    plan: free
     rootDir: .
     buildCommand: npm install && npm run build
     staticPublishPath: dist
