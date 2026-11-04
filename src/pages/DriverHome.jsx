@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api.js'
+import { useFeedback } from '../context/FeedbackContext.jsx'
 
 const formatTime = (value) => new Date(value).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })
 
 export default function DriverHome() {
   const { user, logout, updateProfile } = useAuth()
+  const notify = useFeedback()
   const [groups, setGroups] = useState([])
   const [rides, setRides] = useState([])
   const [tab, setTab] = useState(() => ['requests', 'active', 'profile'].includes(sessionStorage.getItem('cuetgo_driver_tab')) ? sessionStorage.getItem('cuetgo_driver_tab') : 'requests')
@@ -43,11 +45,13 @@ export default function DriverHome() {
     event.preventDefault()
     setError('')
     setSuccess('')
+    notify('প্রোফাইল সংরক্ষণ হচ্ছে…', 'loading', 0)
     setSavingProfile(true)
     try {
       const result = await updateProfile(profileForm)
       if (!result.ok) throw new Error(result.message)
       setEditingProfile(false)
+      notify('প্রোফাইল সফলভাবে আপডেট হয়েছে।', 'success')
       setSuccess('প্রোফাইল আপডেট হয়েছে।')
     } catch (err) {
       setError(err.message)
@@ -59,8 +63,10 @@ export default function DriverHome() {
   async function accept(group) {
     setError('')
     setSuccess('')
+    notify('যাত্রার অনুরোধ গ্রহণ করা হচ্ছে…', 'loading', 0)
     try {
       await api.acceptRide(group.rideIds)
+      notify('যাত্রা সফলভাবে গ্রহণ করা হয়েছে।', 'success')
       setSuccess('যাত্রা গ্রহণ করা হয়েছে। যাত্রীদের জানিয়ে দেওয়া হয়েছে।')
       await refresh()
     } catch (e) {
@@ -71,8 +77,10 @@ export default function DriverHome() {
   async function complete(ride) {
     setError('')
     setSuccess('')
+    notify('যাত্রা সম্পন্ন করা হচ্ছে…', 'loading', 0)
     try {
       await api.completeRide(ride.id)
+      notify('যাত্রা সফলভাবে সম্পন্ন হয়েছে।', 'success')
       setSuccess('যাত্রা সম্পন্ন হিসেবে চিহ্নিত করা হয়েছে।')
       await refresh()
     } catch (e) {
@@ -88,7 +96,7 @@ export default function DriverHome() {
             <p className="text-ink/70 text-xs uppercase tracking-[0.2em]">ড্রাইভার ড্যাশবোর্ড</p>
             <h1 className="text-2xl font-bold mt-2">{user?.name || 'ড্রাইভার'}</h1>
           </div>
-          <button onClick={logout} className="text-sm font-semibold text-ink/80 underline">লগ আউট</button>
+          <button onClick={() => { notify('লগ আউট হচ্ছে…', 'loading', 0); window.setTimeout(logout, 500) }} className="text-sm font-semibold text-ink/80 underline">লগ আউট</button>
         </div>
 
         <div className="mt-5 flex items-center justify-between rounded-2xl bg-white/30 backdrop-blur-sm border border-white/40 px-3 py-2 shadow-soft">
