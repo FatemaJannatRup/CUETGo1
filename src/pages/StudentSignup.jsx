@@ -5,42 +5,35 @@ import Field, { inputClass } from '../components/Field.jsx'
 import GoogleAuthButton from '../components/GoogleAuthButton.jsx'
 
 export default function StudentSignup() {
-  const [credential, setCredential] = useState('')
   const [username, setUsername] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const { googleSignup } = useAuth()
   const navigate = useNavigate()
+  const valid = /^[a-zA-Z0-9_.-]{3,24}$/.test(username.trim())
 
-  async function handleSubmit(event) {
-    event.preventDefault()
+  async function handleGoogle(credential) {
+    if (!valid || busy) return
     setError('')
-    if (!credential) return setError('Verify your CUET Google account first.')
     setBusy(true)
-    const result = await googleSignup(credential, 'student', { username })
+    const result = await googleSignup(credential, 'student', { username: username.trim() })
     setBusy(false)
     if (!result.ok) return setError(result.message)
-    navigate('/student/home')
+    navigate('/student/home', { replace: true })
   }
 
-  return (
-    <div className="h-full min-h-full flex flex-col px-7 py-10 bg-cream">
-      <button onClick={() => navigate('/student/login')} className="text-lilac-600 text-sm mb-6 self-start">← Back</button>
-      <h1 className="font-display text-2xl text-ink mb-1">Create Student Account</h1>
-      <p className="text-ink/60 text-sm mb-6">Use your official CUET student Google account.</p>
-      <GoogleAuthButton text="signup_with" onSuccess={(value) => { setCredential(value); setError('') }} onError={setError} />
-      {credential && <p className="text-center text-xs text-green-700 mb-4">Google identity received. Enter your username below.</p>}
-      <form onSubmit={handleSubmit} className="flex-1 flex flex-col">
-        <Field label="Choose a username">
-          <input className={inputClass} value={username} onChange={(e) => setUsername(e.target.value)} placeholder="e.g. rup_2204064" minLength={3} maxLength={24} required />
-        </Field>
-        <p className="text-xs text-ink/50 mb-4">3–24 characters. Letters, numbers, dots, underscores and hyphens only.</p>
-        {error && <p className="text-rose-500 text-sm mb-3">{error}</p>}
-        <button type="submit" disabled={busy || !credential} className="mt-2 bg-lilac-500 hover:bg-lilac-600 disabled:opacity-60 transition-colors text-white font-medium py-3.5 rounded-full shadow-soft">
-          {busy ? 'Creating account...' : 'Create account'}
-        </button>
-      </form>
-      <p className="text-center text-sm text-ink/60 mt-6">Already registered? <Link to="/student/login" className="text-lilac-600 font-medium">Log in</Link></p>
+  return <div className="auth-page">
+    <button onClick={() => navigate('/student/login')} className="auth-back">← Back to login</button>
+    <div className="auth-brand"><span className="auth-brand-mark">C</span><span>CUET<span className="auth-brand-accent">Go</span></span></div>
+    <div className="auth-heading"><span className="auth-eyebrow">STUDENT ACCOUNT</span><h1>Create your account</h1><p>One quick step before you join your campus rides.</p></div>
+    <div className="auth-panel">
+      <Field label="Choose your username"><input className={inputClass + " auth-input"} value={username} onChange={e => { setUsername(e.target.value); setError('') }} placeholder="e.g. rup_2204064" minLength={3} maxLength={24} autoComplete="username" /></Field>
+      <p className="auth-hint">3–24 characters · Letters, numbers, dots, underscores and hyphens.</p>
+      <div className="auth-divider"><span>THEN CONTINUE WITH</span></div>
+      {valid ? <div className="auth-google">{busy ? <p className="auth-progress">Creating your account and signing you in…</p> : <GoogleAuthButton text="signup_with" onSuccess={handleGoogle} onError={setError} />}</div> : <div className="auth-google auth-google-disabled"><span>G</span><span>Enter a valid username to continue with Google</span></div>}
+      {error && <p className="auth-error" role="alert">{error}</p>}
+      <p className="auth-privacy">Use your official <strong>@student.cuet.ac.bd</strong> Google account. Your account is created automatically after Google verification.</p>
     </div>
-  )
+    <p className="auth-switch">Already have an account? <Link to="/student/login">Log in</Link></p>
+  </div>
 }
