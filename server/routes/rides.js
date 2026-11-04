@@ -10,6 +10,9 @@ function requireApprovedDriver(req, res, next) {
   const db = readDb()
   const driver = db.drivers.find((item) => item.id === req.user.id)
   if (!driver) return res.status(404).json({ message: 'Driver account not found.' })
+  if (driver.verificationStatus === 'rejected') {
+    return res.status(403).json({ message: 'Your driver application was rejected. Please contact CUETGo support.' })
+  }
   if (driver.verificationStatus !== 'approved') {
     return res.status(403).json({ message: 'Your driver account is awaiting administrator approval.' })
   }
