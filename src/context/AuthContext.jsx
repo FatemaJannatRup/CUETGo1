@@ -31,7 +31,17 @@ export function AuthProvider({ children }) {
     setUser((current) => ({ ...(current || {}), ...(nextUser || {}) }))
   }
 
-  async function googleAuth(credential, role, intent = 'login', profile = {}) {\n    try {\n      const { token, user } = await api.googleAuth({ credential, role, intent, profile })\n      persist(token, user)\n      return { ok: true }\n    } catch (e) {\n      return { ok: false, message: e.message }\n    }\n  }\n\n  async function studentSignup(payload) {
+  async function googleAuth(credential, role, intent = 'login', profile = {}) {
+    try {
+      const { token, user } = await api.googleAuth({ credential, role, intent, profile })
+      persist(token, user)
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, message: e.message }
+    }
+  }
+
+  async function studentSignup(payload) {
     try {
       const { token, user } = await api.studentSignup(payload)
       persist(token, user)
