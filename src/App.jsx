@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Welcome from './pages/Welcome.jsx'
 import RoleSelect from './pages/RoleSelect.jsx'
 import StudentLogin from './pages/StudentLogin.jsx'
@@ -23,7 +23,9 @@ function GuestOnly({ children }) {
   return children
 }
 export default function App() {
+  const location = useLocation()
   return <div className="phone-shell"><div className="phone-screen"><div className="screen-scroll">
+    <div key={location.pathname} className="route-transition">
     <Routes>
       <Route path="/" element={<Welcome />} />
       <Route path="/admin" element={<Admin />} />
@@ -36,5 +38,6 @@ export default function App() {
       <Route path="/driver/home" element={<Protected role="driver"><DriverHome /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </div>
   </div></div></div>
 }
