@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import Field, { inputClass } from '../components/Field.jsx'
+import GoogleAuthButton from '../components/GoogleAuthButton.jsx'
 
 const GMAIL = /^[a-zA-Z0-9._%+-]+@gmail\.com$/
 const PHONE = /^01[3-9]\d{8}$/
@@ -11,8 +12,17 @@ export default function DriverLogin() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const { driverLogin } = useAuth()
+  const { driverLogin, googleAuth } = useAuth()
   const navigate = useNavigate()
+
+  async function handleGoogle(credential) {
+    setError('')
+    setBusy(true)
+    const res = await googleAuth(credential, 'driver', 'login')
+    setBusy(false)
+    if (!res.ok) return setError(res.message)
+    navigate('/driver/home')
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -39,6 +49,8 @@ export default function DriverLogin() {
       <h1 className="font-display text-2xl text-ink mb-1">চালক লগইন</h1>
       <p className="text-ink/60 text-sm mb-8">জিমেইল অথবা মোবাইল নম্বর দিয়ে লগইন করুন</p>
 
+      <GoogleAuthButton onSuccess={handleGoogle} onError={setError} />
+      <p className="text-center text-xs text-ink/50 mb-3">অথবা পাসওয়ার্ড দিয়ে লগইন করুন</p>
       <form onSubmit={handleSubmit} className="flex-1 flex flex-col">
         <Field label="জিমেইল অথবা মোবাইল নম্বর">
           <input
