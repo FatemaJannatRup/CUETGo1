@@ -423,3 +423,53 @@ body { background:#edf4f8; color:var(--ink); }
   .admin-stat strong { font-size: 23px; }
   .admin-login-card { padding: 25px 20px; }
 }
+
+
+/* Polished, consistent route and interaction motion across CUETGo. */
+.route-transition {
+  min-height: 100%;
+  animation: cuetgo-route-enter 420ms cubic-bezier(.2,.75,.25,1) both;
+  transform-origin: 50% 18%;
+}
+@keyframes cuetgo-route-enter {
+  from { opacity: 0; transform: translate3d(0, 13px, 0) scale(.995); filter: blur(2px); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); }
+}
+.welcome-topline { animation: cuetgo-soft-enter 520ms 40ms both; }
+.welcome-illustration { animation: cuetgo-soft-enter 620ms 100ms both; }
+.welcome-hero > .auth-eyebrow,
+.welcome-hero h1,
+.welcome-hero p { animation: cuetgo-soft-enter 560ms 170ms both; }
+.welcome-bottom { animation: cuetgo-soft-enter 560ms 240ms both; }
+.role-heading { animation: cuetgo-soft-enter 520ms 90ms both; }
+.role-card { animation: cuetgo-soft-enter 520ms both; }
+.role-card:nth-child(2) { animation-delay: 90ms; }
+@keyframes cuetgo-soft-enter {
+  from { opacity: 0; transform: translateY(9px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+button, a, .app-card, .admin-panel, .role-card {
+  -webkit-tap-highlight-color: transparent;
+}
+button, a, .app-card, .admin-panel {
+  transition-property: transform, box-shadow, background-color, border-color, color, opacity;
+  transition-duration: 180ms;
+  transition-timing-function: cubic-bezier(.2,.7,.25,1);
+}
+button:active { transform: scale(.985); }
+.welcome-cta { transition: transform 180ms cubic-bezier(.2,.7,.25,1), box-shadow 180ms ease, filter 180ms ease; }
+.welcome-cta:hover { transform: translateY(-2px); box-shadow: 0 14px 28px rgba(35,104,143,.25); filter: saturate(1.06); }
+.welcome-cta:focus-visible, .role-card:focus-visible, button:focus-visible, a:focus-visible {
+  outline: 3px solid rgba(49,137,184,.28);
+  outline-offset: 3px;
+}
+.app-tabs button { transition: background-color 200ms ease, color 200ms ease, box-shadow 200ms ease, transform 200ms ease!important; }
+.admin-tabs button { transition: background-color 200ms ease, color 200ms ease, box-shadow 200ms ease, transform 200ms ease!important; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+  }
+}
