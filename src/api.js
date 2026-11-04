@@ -12,6 +12,7 @@ function getApiBase() {
 
 const API_BASE = getApiBase()
 function getToken() { return localStorage.getItem('csr_token') }
+function getAdminToken() { return localStorage.getItem('cuetgo_admin_token') }
 
 async function request(path, { method = 'GET', body, auth = false } = {}) {
   const headers = {}
@@ -28,7 +29,26 @@ async function request(path, { method = 'GET', body, auth = false } = {}) {
   return data
 }
 
+async function adminRequest(path, { method = 'GET', body } = {}) {
+  const headers = { Authorization: `Bearer ${getAdminToken() || ''}` }
+  if (body) headers['Content-Type'] = 'application/json'
+  const res = await fetch(`${API_BASE}/admin${path}`, {
+    method, headers, body: body ? JSON.stringify(body) : undefined,
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.message || 'Admin request failed.')
+  return data
+}
+
 export const api = {
+  adminLogin: (payload) => request('/admin/login', { method: 'POST', body: payload }),
+  adminMe: () => adminRequest('/me'),
+  adminOverview: () => adminRequest('/overview'),
+  adminDrivers: (status = 'all') => adminRequest(`/drivers?status=${encodeURIComponent(status)}`),
+  adminSetDriverStatus: (id, status) => adminRequest(`/drivers/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: { status } }),
+  adminStudents: () => adminRequest('/students'),
+  adminRides: () => adminRequest('/rides'),
+  adminCancelRide: (id) => adminRequest(`/rides/${encodeURIComponent(id)}/cancel`, { method: 'PATCH' }),
   googleSignup: (payload) => request('/auth/google/signup', { method: 'POST', body: payload }),
   googleLogin: (payload) => request('/auth/google/login', { method: 'POST', body: payload }),
   me: () => request('/auth/me', { auth: true }),
