@@ -24,7 +24,8 @@ export default function DriverSignup() {
     setError('')
     if (!form.name.trim()) return setError('নাম লিখুন')
     const val = form.identifier.trim()
-    if (googleCredential && !GMAIL.test(val)) return setError('Enter the same Gmail address you selected with Google.')\n    if (!GMAIL.test(val) && !PHONE.test(val)) {
+    if (googleCredential && !GMAIL.test(val)) return setError('Enter the same Gmail address you selected with Google.')
+    if (!GMAIL.test(val) && !PHONE.test(val)) {
       return setError('জিমেইল অথবা সঠিক মোবাইল নম্বর দিন (যেমন 017XXXXXXXX)')
     }
     if (!/^\d{10}$|^\d{13}$|^\d{17}$/.test(form.nid.trim())) {
