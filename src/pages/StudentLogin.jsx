@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import Field, { inputClass } from '../components/Field.jsx'
+import GoogleAuthButton from '../components/GoogleAuthButton.jsx'
 
 const CUET_EMAIL = /^u\d{7}@student\.cuet\.ac\.bd$/i
 
@@ -10,8 +11,17 @@ export default function StudentLogin() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const { studentLogin } = useAuth()
+  const { studentLogin, googleAuth } = useAuth()
   const navigate = useNavigate()
+
+  async function handleGoogle(credential) {
+    setError('')
+    setBusy(true)
+    const res = await googleAuth(credential, 'student', 'login')
+    setBusy(false)
+    if (!res.ok) return setError(res.message)
+    navigate('/student/home')
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -39,6 +49,8 @@ export default function StudentLogin() {
       <h1 className="font-display text-2xl text-ink mb-1">Student Login</h1>
       <p className="text-ink/60 text-sm mb-8">Sign in with your CUET email</p>
 
+      <GoogleAuthButton onSuccess={handleGoogle} onError={setError} />
+      <p className="text-center text-xs text-ink/50 mb-3">or continue with your password</p>
       <form onSubmit={handleSubmit} className="flex-1 flex flex-col">
         <Field label="CUET Student Email">
           <input
