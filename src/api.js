@@ -6,7 +6,7 @@ const isLocalNetworkHost = ['localhost', '127.0.0.1', '::1'].includes(window.loc
 function getApiBase() {
   if (isLocalNetworkHost) return `http://${window.location.hostname}:5000/api`
   const envUrl = import.meta.env.VITE_API_URL
-  if (!envUrl) throw new Error('VITE_API_URL is missing. Configure the deployed backend URL.')
+  if (!envUrl) return ''
   return envUrl.endsWith('/api') ? envUrl : `${envUrl.replace(/\/$/, '')}/api`
 }
 
