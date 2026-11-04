@@ -48,6 +48,7 @@ async function request(path, { method = 'GET', body, auth = false } = {}) {
 }
 
 export const api = {
+  googleAuth: (payload) => request('/auth/google', { method: 'POST', body: payload }),
   studentSignup: (payload) => request('/auth/student/signup', { method: 'POST', body: payload }),
   studentLogin: (payload) => request('/auth/student/login', { method: 'POST', body: payload }),
   driverSignup: (payload) => request('/auth/driver/signup', { method: 'POST', body: payload }),
