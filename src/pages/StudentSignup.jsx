@@ -33,7 +33,7 @@ export default function StudentSignup() {
     setBusy(true)
     const res = googleCredential
       ? await googleAuth(googleCredential, 'student', 'signup', {
-          name: form.name, studentId: form.studentId, gender: form.gender, hall: form.hall,
+          name: form.name, email: form.email, studentId: form.studentId, gender: form.gender, hall: form.hall,
         })
       : await studentSignup({
           name: form.name, email: form.email.toLowerCase(), studentId: form.studentId,
