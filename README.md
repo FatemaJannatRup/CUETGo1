@@ -1,105 +1,195 @@
-# CUET Shared Ride 
+# CUETGo
 
-A working prototype: React frontend + Node/Express backend + AI-integrated ride
-matching (Google Gemini API, with an automatic rule-based fallback if you
-don't have a key yet).
+CUETGo is a campus ride-sharing web application for **CUET students and rickshaw drivers**. Students can request rides and join available rides, while approved drivers can view and accept ride requests. An administrator can review driver applications and manage rides.
 
-## What's included
+**Live application:** https://cuetgo-frontend-87ru.onrender.com
 
-- **Frontend** (`/` root folder): React + Vite + Tailwind, mobile-app style UI
-- **Backend** (`/server` folder): Express API, JSON file storage (no database
-  installation needed), JWT login, password hashing, Gemini-powered ride
-  matching
+## Features
 
-## 1. Install requirements
+### Student
+- Sign up and sign in with a verified CUET student Google account.
+- Create and edit a student profile.
+- Select pickup and destination locations from CUET campus locations.
+- Request a ride for a selected time and choose one or two seats.
+- Add companion details when requesting two seats.
+- View available rides and join another student's ride when seats are available.
+- Track personal ride status and ride history.
 
-You need **Node.js** installed (version 18 or newer).
-Check with:
+### Rickshaw driver
+- Sign up and sign in with a verified personal Gmail account.
+- Submit name, Bangladeshi mobile number and NID details during registration.
+- Wait for administrator approval before accessing ride requests.
+- View pending ride requests, accept available rides and mark accepted rides as completed.
+- Edit profile details.
+
+### Administrator
+- Sign in through the administrator page at `/admin`.
+- View student, driver and ride information.
+- Review driver applications and approve, reject or return them to pending.
+- View ride activity and cancel pending or accepted rides.
+
+## How ride matching works
+
+When a student requests a ride, CUETGo looks for other pending requests with the same pickup and destination and a nearby requested time. The backend uses the Gemini API when a key is configured. If Gemini is unavailable or no key is configured, the application uses its built-in rule-based matching fallback.
+
+## Technology stack
+
+| Area | Technology |
+| --- | --- |
+| Frontend | React 18, Vite, React Router |
+| Styling | CSS, Tailwind CSS |
+| Backend | Node.js, Express |
+| Authentication | Google Identity / OAuth ID-token verification, JWT |
+| Password hashing | bcryptjs (administrator password verification) |
+| Ride matching | Google Gemini API with rule-based fallback |
+| Data storage | JSON file (`server/data/db.json`) |
+| Deployment | Render |
+
+## Project structure
+
+```text
+CUETGo1/
+├── public/                 # Static frontend assets
+├── src/
+│   ├── components/         # Shared UI components
+│   ├── context/            # Authentication context
+│   ├── pages/              # Welcome, student, driver and admin pages
+│   ├── api.js              # Frontend API client
+│   └── ...
+├── server/
+│   ├── middleware/         # Authentication middleware
+│   ├── routes/             # Authentication, rides and admin APIs
+│   ├── services/           # Ride matching service
+│   ├── data/               # Local JSON data store (created at runtime)
+│   └── index.js            # Express server entry point
+├── render.yaml             # Render deployment configuration
+├── package.json
+└── README.md
 ```
-node -v
+
+## Requirements
+
+- Node.js 18 or newer (an active LTS release is recommended).
+- npm.
+- A Google Cloud OAuth 2.0 Web client ID for Google sign-in.
+- A Gemini API key is optional; ride matching has a fallback when it is not configured.
+
+## Run locally
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/FatemaJannatRup/CUETGo1.git
+cd CUETGo1
 ```
-If you don't have it, download from https://nodejs.org (choose the LTS version).
 
-## 2. Open the project in VS Code
+### 2. Configure the backend
 
-`File > Open Folder` → select the unzipped `cuet-shared-ride` folder.
-
-## 3. Set up the backend
-
-Open a terminal in VS Code (`` Terminal > New Terminal ``) and run:
-
-```
+```bash
 cd server
 npm install
 ```
 
-Create your environment file:
-```
-cp .env.example .env
-```
-(On Windows, use `copy .env.example .env` instead.)
+Create `server/.env` (you can start from `server/.env.example`) and configure:
 
-Open `server/.env` and optionally paste in a Gemini API key:
+```env
+PORT=5000
+NODE_ENV=development
+JWT_SECRET=replace_with_a_long_random_secret
+GOOGLE_CLIENT_ID=your_google_oauth_web_client_id
+ADMIN_EMAIL=your_admin_email
+ADMIN_PASSWORD_HASH=your_bcrypt_password_hash
+GEMINI_API_KEY=
 ```
-GEMINI_API_KEY=your_key_here
+
+Generate a bcrypt hash for the administrator password from the `server` directory:
+
+```bash
+node --input-type=module -e "import bcrypt from 'bcryptjs'; console.log(await bcrypt.hash('CHANGE_THIS_PASSWORD', 12))"
 ```
-If you don't have a Gemini API Key, then you get one at https://aistudio.google.com/app/apikey for free. **This step is
-optional** — if you leave it blank, ride matching still works using a
-simple rule (same route + close request time), so you can demo the app
-immediately without waiting on an API key.
+
+Replace `CHANGE_THIS_PASSWORD` with a strong password, then put the generated hash in `ADMIN_PASSWORD_HASH`. Do not commit your `.env` file, API keys, passwords or generated secrets.
 
 Start the backend:
-```
+
+```bash
 npm run dev
 ```
-You should see:
-```
-CUET Shared Ride backend running on http://localhost:5000
-```
-Leave this terminal running.
 
-## 4. Set up the frontend
+The API runs at `http://localhost:5000`. Its health endpoint is `http://localhost:5000/api/health`.
 
-Open a **second** terminal (`` Terminal > New Terminal `` again — don't close
-the backend one) and run, from the project root:
+### 3. Configure and start the frontend
 
-```
+Open a second terminal at the project root:
+
+```bash
 npm install
+```
+
+Create a root-level `.env` file (you can start from `.env.example`):
+
+```env
+VITE_GOOGLE_CLIENT_ID=your_google_oauth_web_client_id
+VITE_API_URL=http://localhost:5000/api
+```
+
+Then run:
+
+```bash
 npm run dev
 ```
 
-Click the `http://localhost:5173` link shown in the terminal. Narrow your
-browser window (or use dev tools' device mode) to see the mobile layout.
+Open the local URL printed by Vite (normally `http://localhost:5173`).
 
-## 5. Try it out 
+### 4. Configure Google sign-in
 
-1. Welcome screen → **Get Started**
-2. Choose **Student** → **Create an account** → sign up with an email like
-   `uXXXXXXX@student.cuet.ac.bd`
-3. On the student home screen, pick a route and tap **Find a Ride** — this
-   calls the backend, which asks Gemini (or the fallback rule) to look for
-   matching riders
-4. Open a **second browser tab**, choose **Rickshaw Driver** → sign up with
-   a Gmail address or phone number plus an NID number
-5. On the driver home screen (in Bengali), the ride request appears within
-   a few seconds — tap **গ্রহণ করুন** (Accept) to accept it
-6. Switch back to the student tab — the ride status updates to "Driver on
-   the way"
+In Google Cloud Console, create or use an OAuth 2.0 Client ID with application type **Web application**. Add the exact frontend origin to **Authorized JavaScript origins**, for example:
 
-## How the AI matching works
+- `http://localhost:5173` for local development.
+- Your deployed frontend origin for the live application.
 
-When a student requests a ride, the backend sends the pending ride requests
-to Gemini and asks it to group riders by route and request time. If no
-`GEMINI_API_KEY` is set, or the Gemini call fails for any reason, the app
-automatically falls back to a simple rule (same route, requests within 20
-minutes of each other) — so the demo never breaks even without internet
-access to Google's API.
+Use the same Web Client ID for `VITE_GOOGLE_CLIENT_ID` in the frontend and `GOOGLE_CLIENT_ID` in the backend. Never expose a client secret in frontend code.
 
-## Notes for your teacher / presentation
+## API overview
 
-- Data is stored in `server/data/db.json` (auto-created on first run) —
-  you can open it to show real signup/ride data during a demo.
-- Passwords are hashed with bcrypt, not stored in plain text.
-- Login sessions use JWT tokens, sent as `Authorization: Bearer <token>`.
-- This is a prototype: it's for local demo purposes only, not deployed to
-  the internet or production-hardened.
+The backend exposes these main route groups under `/api`:
+
+| Route group | Purpose |
+| --- | --- |
+| `/auth` | Google signup/login, current-user session and profile updates |
+| `/rides` | Campus locations, ride requests, open rides, joining, driver actions and ride history |
+| `/admin` | Administrator login, dashboard data, driver review and ride management |
+| `/health` | Backend health check |
+
+Authenticated endpoints use a JWT in the `Authorization: Bearer <token>` header.
+
+## Deployment on Render
+
+The repository includes a `render.yaml` Blueprint for a frontend static site and backend Node web service.
+
+1. Push the project to GitHub.
+2. In Render, create a new Blueprint deployment and select this repository.
+3. Configure the environment variables requested by the Blueprint:
+   - Backend: `GOOGLE_CLIENT_ID`, `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH`, and optionally `GEMINI_API_KEY`.
+   - Frontend: `VITE_GOOGLE_CLIENT_ID`. The API URL is connected to the backend service by the Blueprint.
+4. Add the deployed frontend URL to the Google OAuth client's authorized JavaScript origins.
+5. Deploy both services and check the backend `/api/health` endpoint.
+
+Keep all credentials in Render environment settings, not in source code or Git.
+
+## Important limitations and security notes
+
+- **Prototype storage:** the backend currently stores records in `server/data/db.json`. This is suitable for local development and demos, but it is not a production database. A Render service's local filesystem may be ephemeral, so records can be lost when the service is restarted or redeployed. Do not rely on this storage for important or permanent data.
+- **No production guarantee:** authentication and validation are implemented for the application's current scope, but the project has not been independently security-audited.
+- **Sensitive information:** driver registration collects NID information. Do not use real personal information in public demos or test environments. Keep access to the administrator account restricted.
+- **Administrator credentials:** use a strong, unique password. The administrator can access account and ride information and change driver approval status.
+- **Google configuration:** Google sign-in will not work until matching client IDs and authorized origins are configured in both frontend and backend environments.
+- **Gemini is optional:** without a valid `GEMINI_API_KEY`, matching falls back to the built-in rule-based approach.
+
+## Contributing
+
+1. Create a feature branch.
+2. Make and test your changes locally.
+3. Open a pull request describing the changes.
+
+Please do not include secrets, real user data, or personal identity information in commits or issue reports.
