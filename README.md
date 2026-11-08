@@ -12,14 +12,17 @@ CUETGo is a campus ride-sharing web application for **CUET students and rickshaw
 - Select pickup and destination locations from CUET campus locations.
 - Request a ride for a selected time and choose one or two seats.
 - Add companion details when requesting two seats.
-- View available rides and join another student's ride when seats are available.
+- View AI-ranked shared-ride recommendations based on route overlap, requested time and seat availability.
+- Join another student's ride when seats are available.
 - Track personal ride status and ride history.
 
 ### Rickshaw driver
 - Sign up and sign in with a verified personal Gmail account.
 - Submit name, Bangladeshi mobile number and NID details during registration.
 - Wait for administrator approval before accessing ride requests.
-- View pending ride requests, accept available rides and mark accepted rides as completed.
+- View pending ride requests grouped into compatible shared trips.
+- Request an optimized stop order for a shared trip before accepting it.
+- Accept available rides and mark accepted rides as completed.
 - Edit profile details.
 
 ### Administrator
@@ -30,7 +33,7 @@ CUETGo is a campus ride-sharing web application for **CUET students and rickshaw
 
 ## How ride matching works
 
-When a student requests a ride, CUETGo looks for other pending requests with the same pickup and destination and a nearby requested time. The backend uses the Gemini API when a key is configured. If Gemini is unavailable or no key is configured, the application uses its built-in rule-based matching fallback.
+When a student requests a ride, CUETGo ranks pending requests using route overlap (same pickup, same destination or reverse direction), requested-time proximity and the two-seat rickshaw capacity. If a Gemini API key is configured, Gemini can refine the ranking and explanations; otherwise a deterministic scoring fallback is used. Drivers can request a stop order for a compatible shared trip. Gemini proposes an order when configured, and the backend validates that every known stop is used exactly once and each pickup precedes its drop-off. A safe heuristic fallback is used when Gemini is unavailable. The stop order is a planning suggestion, not turn-by-turn navigation or a live road-traffic route.
 
 ## Technology stack
 
@@ -41,7 +44,7 @@ When a student requests a ride, CUETGo looks for other pending requests with the
 | Backend | Node.js, Express |
 | Authentication | Google Identity / OAuth ID-token verification, JWT |
 | Password hashing | bcryptjs (administrator password verification) |
-| Ride matching | Google Gemini API with rule-based fallback |
+| Ride matching and stop-order suggestions | Google Gemini API with deterministic fallback |
 | Data storage | JSON file (`server/data/db.json`) |
 | Deployment | Render |
 
@@ -72,7 +75,7 @@ CUETGo1/
 - Node.js 18 or newer (an active LTS release is recommended).
 - npm.
 - A Google Cloud OAuth 2.0 Web client ID for Google sign-in.
-- A Gemini API key is optional; ride matching has a fallback when it is not configured.
+- A Gemini API key is optional; ride matching and stop-order suggestions have deterministic fallbacks when it is not configured.
 
 ## Run locally
 
@@ -184,7 +187,8 @@ Keep all credentials in Render environment settings, not in source code or Git.
 - **Sensitive information:** driver registration collects NID information. Do not use real personal information in public demos or test environments. Keep access to the administrator account restricted.
 - **Administrator credentials:** use a strong, unique password. The administrator can access account and ride information and change driver approval status.
 - **Google configuration:** Google sign-in will not work until matching client IDs and authorized origins are configured in both frontend and backend environments.
-- **Gemini is optional:** without a valid `GEMINI_API_KEY`, matching falls back to the built-in rule-based approach.
+- **Gemini is optional:** without a valid `GEMINI_API_KEY`, matching uses deterministic scoring and route planning uses a safe stop-order heuristic.
+- **Route planning scope:** route optimization currently orders the campus pickup/drop-off stops for a shared trip. It does not calculate road geometry, turn-by-turn directions, live traffic or exact travel distances.
 
 ## Contributing
 
