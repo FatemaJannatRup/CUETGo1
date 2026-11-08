@@ -177,27 +177,41 @@ router.get('/pending', requireAuth('driver'), requireApprovedDriver, async (req,
     .filter((r) => r.status === 'pending')
     .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
 
-  const grouped = {}
-  for (const r of pending) {
-    const timeKey = new Date(r.requestedTime || r.createdAt).toISOString().slice(0, 16)
-    const key = `${r.from}__${r.to}__${timeKey}`
-    if (!grouped[key]) {
-      grouped[key] = {
-        key,
-        from: r.from,
-        to: r.to,
-        fare: r.fare,
-        rideIds: [],
-        riders: 0,
-        time: r.createdAt,
-        requestedTime: r.requestedTime || r.createdAt,
-      }
-    }
-    grouped[key].rideIds.push(r.id)
-    grouped[key].riders += Number(r.passengerCount || r.seats || 1)
-  }
+  const groups = []
+  for (const ride of pending) {
+    const rideTime = new Date(ride.requestedTime || ride.createdAt).getTime()
+    const rideSeats = Number(ride.seats || 1)
+    const compatible = groups.find((group) => {
+      const timeGap = Math.abs(new Date(group.requestedTime).getTime() - rideTime)
+      const currentSeats = group.rideIds.reduce((sum, id) => {
+        const item = pending.find((candidate) => candidate.id === id)
+        return sum + Number(item?.seats || 1)
+      }, 0)
+      const sharesEndpoint = group.rideIds.some((id) => {
+        const item = pending.find((candidate) => candidate.id === id)
+        return item && (item.from === ride.from || item.to === ride.to || item.from === ride.to || item.to === ride.from)
+      })
+      return sharesEndpoint && timeGap <= 20 * 60 * 1000 && currentSeats + rideSeats <= 2
+    })
 
-  res.json({ groups: Object.values(grouped) })
+    if (compatible) {
+      compatible.rideIds.push(ride.id)
+      compatible.riders += Number(ride.passengerCount || ride.seats || 1)
+      compatible.fare += Number(ride.fare || 0)
+    } else {
+      groups.push({
+        key: ride.id,
+        from: ride.from,
+        to: ride.to,
+        fare: Number(ride.fare || 0),
+        rideIds: [ride.id],
+        riders: Number(ride.passengerCount || ride.seats || 1),
+        time: ride.createdAt,
+        requestedTime: ride.requestedTime || ride.createdAt,
+      })
+    }
+  }
+  res.json({ groups })
 })
 
 router.post('/optimize', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
