@@ -1,7 +1,6 @@
 import fetch from 'node-fetch'
 
-const GEMINI_URL = (key) =>
-  `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent'
 
 const minutesApart = (a, b) =>
   Math.abs(new Date(a.requestedTime || a.createdAt).getTime() - new Date(b.requestedTime || b.createdAt).getTime()) / 60000
@@ -54,7 +53,7 @@ export async function findMatches(target, candidates) {
   try {
     const res = await fetch(GEMINI_URL(key), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
     })
     if (!res.ok) throw new Error(`Gemini returned HTTP ${res.status}`)
