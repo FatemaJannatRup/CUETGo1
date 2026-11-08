@@ -2,7 +2,7 @@ import { Router } from 'express'
 import crypto from 'crypto'
 import { readDb, writeDb } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
-import { findMatches } from '../services/gemini.js'
+import { findMatches, optimizeSharedRoute } from '../services/gemini.js'
 
 const router = Router()
 
@@ -120,9 +120,10 @@ router.post('/request', requireAuth('student'), async (req, res) => {
 
   db.rides.push(ride)
 
-  const others = db.rides.filter((r) => r.status === 'pending' && r.id !== ride.id && r.from === from && r.to === to && Math.abs(new Date(r.requestedTime || r.createdAt) - new Date(ride.requestedTime)) < 30 * 60 * 1000 && (Number(r.seats || 1) + ride.seats) <= 2)
+  const others = db.rides.filter((r) => r.status === 'pending' && r.id !== ride.id && Math.abs(new Date(r.requestedTime || r.createdAt) - new Date(ride.requestedTime)) <= 45 * 60 * 1000 && (Number(r.seats || 1) + ride.seats) <= 2)
   const matches = await findMatches(ride, others)
   ride.matchedRideIds = matches.map((m) => m.rideId)
+  ride.matchDetails = matches
   writeDb(db)
 
   const matchedRiders = ride.matchedRideIds
@@ -170,7 +171,7 @@ router.get('/mine', requireAuth('student'), (req, res) => {
   res.json({ rides: mine })
 })
 
-router.get('/pending', requireAuth('driver'), requireApprovedDriver, (req, res) => {
+router.get('/pending', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
   const db = readDb()
   const pending = db.rides
     .filter((r) => r.status === 'pending')
@@ -196,7 +197,12 @@ router.get('/pending', requireAuth('driver'), requireApprovedDriver, (req, res) 
     grouped[key].riders += Number(r.passengerCount || r.seats || 1)
   }
 
-  res.json({ groups: Object.values(grouped) })
+  const groups = await Promise.all(Object.values(grouped).map(async (group) => {
+    const groupRides = group.rideIds.map((id) => db.rides.find((ride) => ride.id === id)).filter(Boolean)
+    const routePlan = await optimizeSharedRoute(groupRides)
+    return { ...group, routePlan: routePlan.stops, routeOptimization: routePlan.method }
+  }))
+  res.json({ groups })
 })
 
 router.post('/accept', requireAuth('driver'), requireApprovedDriver, (req, res) => {
