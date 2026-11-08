@@ -88,7 +88,7 @@ export async function optimizeSharedRoute(rides) {
     try {
       const res = await fetch(GEMINI_URL(key), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
       })
       if (!res.ok) throw new Error(`Gemini returned HTTP ${res.status}`)
