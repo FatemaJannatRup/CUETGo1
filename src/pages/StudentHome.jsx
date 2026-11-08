@@ -75,10 +75,20 @@ export default function StudentHome() {
   }, [])
 
   const recommendedRides = useMemo(() => {
+    const matchDetails = new Map()
+    rides.forEach((request) => {
+      ;(request.matchDetails || []).forEach((match) => matchDetails.set(match.rideId, match))
+    })
     return openRides
-      .filter((ride) => ride.from === user?.hall || ride.to === user?.hall || ride.from === form.from || ride.to === form.to)
+      .map((ride) => ({
+        ...ride,
+        aiMatch: matchDetails.get(ride.id) || null,
+        relevance: matchDetails.has(ride.id) ? 100 : (ride.from === form.from ? 30 : 0) + (ride.to === form.to ? 30 : 0) + (ride.from === user?.hall || ride.to === user?.hall ? 10 : 0),
+      }))
+      .filter((ride) => ride.aiMatch || ride.relevance > 0)
+      .sort((a, b) => b.relevance - a.relevance)
       .slice(0, 3)
-  }, [openRides, user?.hall, form.from, form.to])
+  }, [openRides, rides, user?.hall, form.from, form.to])
 
   const pendingRides = rides.filter((ride) => ride.status === 'pending')
   const acceptedRides = rides.filter((ride) => ride.status === 'accepted')
@@ -286,6 +296,7 @@ export default function StudentHome() {
                         <div>
                           <p className="font-bold text-ink">{ride.from} → {ride.to}</p>
                           <p className="text-xs text-ink/60 mt-1">{ride.hostName} • {formatTime(ride.requestedTime || ride.createdAt)}</p>
+                          {ride.aiMatch && <p className="mt-2 text-xs font-semibold text-violet-700">✨ AI match · {ride.aiMatch.reason}</p>}
                         </div>
                         <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold uppercase text-emerald-700">{Math.max(0, 2 - Number(ride.seats || 1))} left</span>
                       </div>
