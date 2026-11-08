@@ -9,6 +9,8 @@ export default function DriverHome() {
   const { user, logout, updateProfile } = useAuth()
   const notify = useFeedback()
   const [groups, setGroups] = useState([])
+  const [optimizedPlans, setOptimizedPlans] = useState({})
+  const [optimizingKey, setOptimizingKey] = useState(null)
   const [rides, setRides] = useState([])
   const [tab, setTab] = useState(() => ['requests', 'active', 'profile'].includes(sessionStorage.getItem('cuetgo_driver_tab')) ? sessionStorage.getItem('cuetgo_driver_tab') : 'requests')
   const [error, setError] = useState('')
@@ -73,6 +75,22 @@ export default function DriverHome() {
     } catch (e) {
       notify(e.message, 'error')
       setError(e.message)
+    }
+  }
+
+  async function optimizeRoute(group) {
+    setError('')
+    setOptimizingKey(group.key)
+    notify('শেয়ার্ড রুট অপ্টিমাইজ করা হচ্ছে…', 'loading', 0)
+    try {
+      const plan = await api.optimizeRideRoute(group.rideIds)
+      setOptimizedPlans((previous) => ({ ...previous, [group.key]: plan }))
+      notify('রুট সাজানো হয়েছে।', 'success')
+    } catch (err) {
+      notify(err.message, 'error')
+      setError(err.message)
+    } finally {
+      setOptimizingKey(null)
     }
   }
 
@@ -147,7 +165,17 @@ export default function DriverHome() {
                         <span className="rounded-full bg-sky-100 px-2 py-1 text-[10px] font-bold uppercase text-sky-700">{group.riders}/২ সিট</span>
                       </div>
                       <p className="text-xs text-ink/60 mt-2">{formatTime(group.requestedTime)} • ৳{group.fare} ভাড়া</p>
-                      <button onClick={() => accept(group)} className="primary-btn w-full mt-3 py-3 text-xs uppercase tracking-[0.14em]">যাত্রা গ্রহণ করুন</button>
+                      {optimizedPlans[group.key] && (
+                        <div className="mt-3 rounded-xl border border-violet-100 bg-violet-50 p-3">
+                          <p className="text-xs font-bold text-violet-800">✨ প্রস্তাবিত স্টপের ক্রম</p>
+                          <p className="mt-1 text-sm font-semibold text-ink">{optimizedPlans[group.key].stops.join(' → ')}</p>
+                          <p className="mt-1 text-[10px] text-ink/60">{optimizedPlans[group.key].method === 'gemini' ? 'Gemini AI suggestion' : 'Smart fallback suggestion'} · এটি আনুমানিক স্টপ-ক্রম, turn-by-turn navigation নয়।</p>
+                        </div>
+                      )}
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <button onClick={() => optimizeRoute(group)} disabled={optimizingKey === group.key} className="secondary-btn py-3 text-xs disabled:opacity-50">{optimizingKey === group.key ? 'রুট সাজানো হচ্ছে…' : '✨ রুট সাজান'}</button>
+                        <button onClick={() => accept(group)} className="primary-btn py-3 text-xs uppercase tracking-[0.10em]">যাত্রা গ্রহণ করুন</button>
+                      </div>
                     </div>
                   ))}
                 </div>
