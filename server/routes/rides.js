@@ -197,12 +197,19 @@ router.get('/pending', requireAuth('driver'), requireApprovedDriver, async (req,
     grouped[key].riders += Number(r.passengerCount || r.seats || 1)
   }
 
-  const groups = await Promise.all(Object.values(grouped).map(async (group) => {
-    const groupRides = group.rideIds.map((id) => db.rides.find((ride) => ride.id === id)).filter(Boolean)
-    const routePlan = await optimizeSharedRoute(groupRides)
-    return { ...group, routePlan: routePlan.stops, routeOptimization: routePlan.method }
-  }))
-  res.json({ groups })
+  res.json({ groups: Object.values(grouped) })
+})
+
+router.post('/optimize', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
+  const rideIds = Array.isArray(req.body?.rideIds) ? [...new Set(req.body.rideIds)] : []
+  if (!rideIds.length || rideIds.length > 2) return res.status(400).json({ message: 'Select one shared ride group to optimize.' })
+  const db = readDb()
+  const selected = rideIds.map((id) => db.rides.find((ride) => ride.id === id && ride.status === 'pending')).filter(Boolean)
+  if (selected.length !== rideIds.length) return res.status(409).json({ message: 'One or more ride requests are no longer available.' })
+  const totalSeats = selected.reduce((sum, ride) => sum + Number(ride.seats || 1), 0)
+  if (totalSeats > 2) return res.status(409).json({ message: 'A rickshaw can carry a maximum of two passengers.' })
+  const plan = await optimizeSharedRoute(selected)
+  res.json({ ...plan, legs: selected.map((ride) => ({ from: ride.from, to: ride.to })) })
 })
 
 router.post('/accept', requireAuth('driver'), requireApprovedDriver, (req, res) => {
