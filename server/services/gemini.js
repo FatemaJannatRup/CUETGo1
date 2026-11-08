@@ -106,21 +106,29 @@ export async function optimizeSharedRoute(rides) {
     }
   }
 
-  // Safe deterministic fallback: prioritize the most common pickup, then compatible
-  // drop-offs. This is a stop-order heuristic, not turn-by-turn road navigation.
-  const pickupCounts = new Map()
-  rides.forEach((ride) => pickupCounts.set(ride.from, (pickupCounts.get(ride.from) || 0) + 1))
-  const first = [...pickupCounts.entries()].sort((a, b) => b[1] - a[1])[0][0]
-  const ordered = [first]
-  const remaining = new Set(stops.filter((stop) => stop !== first))
-  while (remaining.size) {
-    const nextRide = rides.find((ride) => ride.from === ordered[ordered.length - 1] && remaining.has(ride.to))
-    const next = nextRide?.to || [...remaining][0]
-    ordered.push(next)
-    remaining.delete(next)
+  // Deterministic topological ordering: every pickup must appear before its
+  // corresponding drop-off. Prefer frequently used pickup points when several
+  // stops are ready. This is a stop-order heuristic, not turn-by-turn navigation.
+  const outgoing = new Map(stops.map((stop) => [stop, []]))
+  const indegree = new Map(stops.map((stop) => [stop, 0]))
+  rides.forEach((ride) => {
+    if (!outgoing.get(ride.from).includes(ride.to)) {
+      outgoing.get(ride.from).push(ride.to)
+      indegree.set(ride.to, indegree.get(ride.to) + 1)
+    }
+  })
+  const pickupCounts = new Map(stops.map((stop) => [stop, rides.filter((ride) => ride.from === stop).length]))
+  const ready = stops.filter((stop) => indegree.get(stop) === 0)
+  const ordered = []
+  while (ready.length) {
+    ready.sort((a, b) => (pickupCounts.get(b) || 0) - (pickupCounts.get(a) || 0))
+    const current = ready.shift()
+    ordered.push(current)
+    for (const next of outgoing.get(current)) {
+      indegree.set(next, indegree.get(next) - 1)
+      if (indegree.get(next) === 0) ready.push(next)
+    }
   }
-  if (!rides.every((ride) => ordered.indexOf(ride.from) < ordered.indexOf(ride.to))) {
-    return { stops, method: 'safe-default' }
-  }
+  if (ordered.length !== stops.length) return { stops, method: 'safe-default' }
   return { stops: ordered, method: 'heuristic' }
 }
