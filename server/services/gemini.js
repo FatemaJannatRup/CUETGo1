@@ -3,62 +3,124 @@ import fetch from 'node-fetch'
 const GEMINI_URL = (key) =>
   `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`
 
-/**
- * Rule-based fallback: match requests on the same route, requested
- * within 20 minutes of each other.
- */
-function ruleBasedMatch(target, candidates) {
-  const targetTime = new Date(target.createdAt).getTime()
-  return candidates
-    .filter((c) => c.id !== target.id)
-    .filter((c) => c.from === target.from && c.to === target.to)
-    .filter((c) => Math.abs(new Date(c.createdAt).getTime() - targetTime) <= 20 * 60 * 1000)
-    .map((c) => ({ rideId: c.id, reason: 'Same route, close request time' }))
+const minutesApart = (a, b) =>
+  Math.abs(new Date(a.requestedTime || a.createdAt).getTime() - new Date(b.requestedTime || b.createdAt).getTime()) / 60000
+
+function routeSimilarity(a, b) {
+  if (a.from === b.from && a.to === b.to) return 100
+  if (a.from === b.from || a.to === b.to) return 75
+  if (a.from === b.to || a.to === b.from) return 55
+  return 0
+}
+
+function scoreCandidate(target, candidate) {
+  const gap = minutesApart(target, candidate)
+  const route = routeSimilarity(target, candidate)
+  if (!Number.isFinite(gap) || gap > 45 || route === 0) return null
+  const seats = Number(target.seats || 1) + Number(candidate.seats || 1)
+  if (seats > 2) return null
+  const timeScore = Math.max(0, 40 - gap)
+  return {
+    rideId: candidate.id,
+    score: Math.round(route * 0.6 + timeScore),
+    reason: route === 100
+      ? `Same pickup and destination; ${Math.round(gap)} min apart`
+      : route >= 75
+        ? `Shares a ${target.from === candidate.from ? 'pickup' : 'destination'} point and has compatible timing`
+        : 'Reverse-direction route with compatible timing',
+  }
 }
 
 /**
- * Ask Gemini to decide which pending ride requests should be grouped
- * with the target request. Falls back to rule-based matching if no
- * API key is set or the call fails.
+ * Rank feasible shared-ride candidates using route overlap, pickup time and seat capacity.
+ * Gemini may refine the explanations/ranking, but its output is validated against this
+ * deterministic candidate set. The local scorer always works without an API key.
  */
 export async function findMatches(target, candidates) {
+  const pool = candidates
+    .filter((c) => c.id !== target.id && c.status === 'pending')
+    .map((candidate) => scoreCandidate(target, candidate))
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 8)
+
+  if (!pool.length) return []
   const key = process.env.GEMINI_API_KEY
-  const pool = candidates.filter((c) => c.id !== target.id && c.status === 'pending')
+  if (!key) return pool
 
-  if (!key) {
-    return ruleBasedMatch(target, pool)
-  }
-
-  const prompt = `You are a ride-matching assistant for a university campus shared-rickshaw app.
-Given a target ride request and a list of other pending ride requests, decide which ones would
-make good ride-share companions for the target rider. Prioritize: (1) same or very similar route
-(same pickup and destination), (2) requested at a similar time (within about 20 minutes).
-Respond ONLY with a JSON array, no other text, of objects like:
-[{"rideId": "abc123", "reason": "short reason"}]
-If no good matches, respond with [].
-
-Target request: ${JSON.stringify({ from: target.from, to: target.to, createdAt: target.createdAt })}
-
-Other pending requests: ${JSON.stringify(
-    pool.map((p) => ({ rideId: p.id, from: p.from, to: p.to, createdAt: p.createdAt }))
-  )}`
+  const allowed = new Set(pool.map((item) => item.rideId))
+  const prompt = `You are assisting a campus shared-rickshaw service. Rank only the supplied feasible candidate ride IDs. Consider same/shared pickup or destination, requested time proximity, and seat capacity already checked by the system. Do not invent IDs or claim a route is feasible if it is not. Return ONLY JSON: [{"rideId":"...","reason":"short explanation"}]. Candidates: ${JSON.stringify(pool)}`
 
   try {
     const res = await fetch(GEMINI_URL(key), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-      }),
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
     })
+    if (!res.ok) throw new Error(`Gemini returned HTTP ${res.status}`)
     const data = await res.json()
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '[]'
-    const cleaned = text.replace(/```json|```/g, '').trim()
-    const parsed = JSON.parse(cleaned)
-    if (Array.isArray(parsed)) return parsed
-    return ruleBasedMatch(target, pool)
+    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || '[]'
+    const parsed = JSON.parse(raw.replace(/```json|\`\`\`/g, '').trim())
+    if (!Array.isArray(parsed)) return pool
+    const ranked = parsed
+      .filter((item) => item && allowed.has(item.rideId))
+      .map((item) => ({ ...pool.find((p) => p.rideId === item.rideId), reason: String(item.reason || pool.find((p) => p.rideId === item.rideId).reason).slice(0, 160) }))
+    const seen = new Set(ranked.map((item) => item.rideId))
+    return [...ranked, ...pool.filter((item) => !seen.has(item.rideId))]
   } catch (err) {
-    console.error('Gemini matching failed, using rule-based fallback:', err.message)
-    return ruleBasedMatch(target, pool)
+    console.error('Gemini ride ranking failed; using local ranking:', err.message)
+    return pool
   }
+}
+
+/**
+ * Optimize a shared ride's ordered campus stops. Gemini can suggest an ordering;
+ * the result is accepted only if it contains exactly the known stops. When unavailable,
+ * the deterministic fallback keeps pickup-before-dropoff constraints and groups shared
+ * endpoints first. No travel times or road distances are fabricated.
+ */
+export async function optimizeSharedRoute(rides) {
+  const stops = [...new Set(rides.flatMap((ride) => [ride.from, ride.to]))]
+  if (stops.length < 2) return { stops, method: 'direct' }
+
+  const key = process.env.GEMINI_API_KEY
+  if (key) {
+    const prompt = `Optimize the order of these CUET campus locations for one shared rickshaw trip. Return ONLY a JSON array of location names, using every supplied location exactly once and no other names. Prefer an order that serves shared route endpoints efficiently. Locations: ${JSON.stringify(stops)}. Ride legs (each pickup must occur before its own dropoff): ${JSON.stringify(rides.map((r) => ({ from: r.from, to: r.to })))}`
+    try {
+      const res = await fetch(GEMINI_URL(key), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+      })
+      if (!res.ok) throw new Error(`Gemini returned HTTP ${res.status}`)
+      const data = await res.json()
+      const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || '[]'
+      const parsed = JSON.parse(raw.replace(/```json|\`\`\`/g, '').trim())
+      if (Array.isArray(parsed) && parsed.length === stops.length &&
+          new Set(parsed).size === stops.length && parsed.every((stop) => stops.includes(stop)) &&
+          rides.every((ride) => parsed.indexOf(ride.from) < parsed.indexOf(ride.to))) {
+        return { stops: parsed, method: 'gemini' }
+      }
+    } catch (err) {
+      console.error('Gemini route optimization failed; using safe fallback:', err.message)
+    }
+  }
+
+  // Safe deterministic fallback: prioritize the most common pickup, then compatible
+  // drop-offs. This is a stop-order heuristic, not turn-by-turn road navigation.
+  const pickupCounts = new Map()
+  rides.forEach((ride) => pickupCounts.set(ride.from, (pickupCounts.get(ride.from) || 0) + 1))
+  const first = [...pickupCounts.entries()].sort((a, b) => b[1] - a[1])[0][0]
+  const ordered = [first]
+  const remaining = new Set(stops.filter((stop) => stop !== first))
+  while (remaining.size) {
+    const nextRide = rides.find((ride) => ride.from === ordered[ordered.length - 1] && remaining.has(ride.to))
+    const next = nextRide?.to || [...remaining][0]
+    ordered.push(next)
+    remaining.delete(next)
+  }
+  if (!rides.every((ride) => ordered.indexOf(ride.from) < ordered.indexOf(ride.to))) {
+    return { stops, method: 'safe-default' }
+  }
+  return { stops: ordered, method: 'heuristic' }
 }
