@@ -7,14 +7,18 @@ import adminRoutes from './routes/admin.js'
 
 const app = express()
 app.set('trust proxy', 1)
-app.use(cors({
-  origin: true,
+const allowedOrigins = [
+  'https://cuetgo-frontend-87ru.onrender.com',
+  'http://localhost:5173',
+]
+const corsOptions = {
+  origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-}))
-
-app.options('*', cors())
+}
+app.use(cors(corsOptions))
+app.options('*', cors(corsOptions))
 app.use(express.json())
 
 app.use('/api/auth', authRoutes)
