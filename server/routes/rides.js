@@ -77,7 +77,7 @@ router.post('/request', requireAuth('student'), async (req, res) => {
     return res.status(400).json({ message: 'For 2-seat rides, add the companion name and phone number.' })
   }
 
-  const db = readDb()
+  const db = await readDb()
   const student = db.students.find((s) => s.id === req.user.id)
   if (!student) return res.status(404).json({ message: 'Student account not found.' })
 
@@ -139,7 +139,7 @@ router.post('/request', requireAuth('student'), async (req, res) => {
 router.post('/:id/join', requireAuth('student'), async (req, res) => {
   const seatCount = Number(req.body?.seats || 1)
   if (![1, 2].includes(seatCount)) return res.status(400).json({ message: 'Choose 1 or 2 seats.' })
-  const db = readDb()
+  const db = await readDb()
   const ride = db.rides.find((r) => r.id === req.params.id && r.status === 'pending' && r.studentId !== req.user.id)
   if (!ride) return res.status(404).json({ message: 'Open ride not found.' })
   if ((Number(ride.seats) || 1) + seatCount > 2) {
@@ -161,12 +161,12 @@ router.post('/:id/join', requireAuth('student'), async (req, res) => {
   ride.seats = Number(ride.seats || 1) + seatCount
   ride.passengerCount = Number(ride.passengerCount || ride.seats || 1) + seatCount
   ride.fare = fareFor(ride.from, ride.to) * Math.max(1, Number(ride.seats || 1))
-  writeDb(db)
+  await writeDb(db)
   res.json({ ride, joined: true })
 })
 
 router.get('/mine', requireAuth('student'), async (req, res) => {
-  const db = readDb()
+  const db = await readDb()
   const mine = db.rides
     .filter((r) => r.studentId === req.user.id || (Array.isArray(r.passengers) && r.passengers.some((p) => p.studentId === req.user.id)))
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
@@ -174,7 +174,7 @@ router.get('/mine', requireAuth('student'), async (req, res) => {
 })
 
 router.get('/pending', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
-  const db = readDb()
+  const db = await readDb()
   const pending = db.rides
     .filter((r) => r.status === 'pending')
     .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
@@ -219,7 +219,7 @@ router.get('/pending', requireAuth('driver'), requireApprovedDriver, async (req,
 router.post('/optimize', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
   const rideIds = Array.isArray(req.body?.rideIds) ? [...new Set(req.body.rideIds)] : []
   if (!rideIds.length || rideIds.length > 2) return res.status(400).json({ message: 'Select one shared ride group to optimize.' })
-  const db = readDb()
+  const db = await readDb()
   const selected = rideIds.map((id) => db.rides.find((ride) => ride.id === id && ride.status === 'pending')).filter(Boolean)
   if (selected.length !== rideIds.length) return res.status(409).json({ message: 'One or more ride requests are no longer available.' })
   const totalSeats = selected.reduce((sum, ride) => sum + Number(ride.seats || 1), 0)
@@ -234,7 +234,7 @@ router.post('/accept', requireAuth('driver'), requireApprovedDriver, async (req,
     return res.status(400).json({ message: 'No ride selected.' })
   }
 
-  const db = readDb()
+  const db = await readDb()
   const selectedRideIds = [...new Set(rideIds)]
   const acceptedByDriver = db.rides.filter((ride) => ride.driverId === req.user.id && ['accepted', 'completed'].includes(ride.status))
 
@@ -263,24 +263,24 @@ router.post('/accept', requireAuth('driver'), requireApprovedDriver, async (req,
     ride.acceptedAt = new Date().toISOString()
   }
 
-  writeDb(db)
+  await writeDb(db)
   res.json({ accepted: selectedRideIds.length })
 })
 
 router.post('/:id/complete', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
-  const db = readDb()
+  const db = await readDb()
   const ride = db.rides.find((item) => item.id === req.params.id && item.driverId === req.user.id)
   if (!ride) return res.status(404).json({ message: 'Ride not found.' })
 
   ride.status = 'completed'
   ride.completedAt = new Date().toISOString()
   ride.paidOut = false
-  writeDb(db)
+  await writeDb(db)
   res.json({ ride })
 })
 
 router.get('/mine-driver', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
-  const db = readDb()
+  const db = await readDb()
   const mine = db.rides
     .filter((r) => r.driverId === req.user.id)
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
