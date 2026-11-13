@@ -217,6 +217,7 @@ router.put('/profile', requireAuth(), async (req, res) => {
     student.name = username
     student.hall = hall
     student.gender = gender
+    student.updatedAt = new Date().toISOString()
     await writeDb(db)
     return res.json({ user: publicStudent(student) })
   }
@@ -240,6 +241,7 @@ router.put('/profile', requireAuth(), async (req, res) => {
     driver.name = name
     driver.phone = phone
     driver.identifier = phone
+    driver.updatedAt = new Date().toISOString()
     await writeDb(db)
     return res.json({ user: publicDriver(driver) })
   }

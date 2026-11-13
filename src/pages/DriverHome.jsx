@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api.js'
 import { useFeedback } from '../context/FeedbackContext.jsx'
@@ -19,6 +19,31 @@ export default function DriverHome() {
   const [editingProfile, setEditingProfile] = useState(false)
   const [profileForm, setProfileForm] = useState({ name: user?.name || '', phone: user?.phone || '' })
   const [savingProfile, setSavingProfile] = useState(false)
+
+  // A driver accepts a compatible pair as one shared trip. Present it as one
+  // card and combine passenger/seat totals rather than duplicating the trip.
+  const displayRides = useMemo(() => {
+    const grouped = new Map()
+    for (const ride of rides) {
+      const key = ride.sharedGroupId || ride.id
+      const existing = grouped.get(key)
+      if (!existing) {
+        grouped.set(key, {
+          ...ride,
+          groupRideIds: [ride.id],
+          passengers: [...(ride.passengers || [])],
+          seats: Number(ride.seats || 1),
+          fare: Number(ride.fare || 0),
+        })
+      } else {
+        existing.groupRideIds.push(ride.id)
+        existing.passengers.push(...(ride.passengers || []))
+        existing.seats += Number(ride.seats || 1)
+        existing.fare += Number(ride.fare || 0)
+      }
+    }
+    return Array.from(grouped.values())
+  }, [rides])
 
   const refresh = async () => {
     try {
@@ -109,6 +134,35 @@ export default function DriverHome() {
     }
   }
 
+  async function cancelAcceptedRide(ride) {
+    setError('')
+    setSuccess('')
+    const confirmed = window.confirm('Cancel this accepted ride? The system will reopen it if there is still time before the 2-minute booking cutoff; otherwise passengers will see it as cancelled.')
+    if (!confirmed) return
+    try {
+      await api.driverCancelRide(ride.id)
+      notify('যাত্রার অবস্থা আপডেট হয়েছে।', 'success')
+      setSuccess('যাত্রার অবস্থা আপডেট হয়েছে।')
+      await refresh()
+    } catch (err) {
+      notify(err.message, 'error')
+      setError(err.message)
+    }
+  }
+
+  async function updateRideStatus(ride, status) {
+    setError('')
+    try {
+      await api.updateRideStatus(ride.id, status)
+      notify(status === 'arrived' ? 'আপনি পিকআপ স্থানে পৌঁছেছেন।' : 'যাত্রা শুরু হয়েছে।', 'success')
+      setSuccess(status === 'arrived' ? 'পিকআপ স্থানে পৌঁছেছেন হিসেবে চিহ্নিত হয়েছে।' : 'যাত্রা শুরু হয়েছে।')
+      await refresh()
+    } catch (err) {
+      notify(err.message, 'error')
+      setError(err.message)
+    }
+  }
+
   return (
     <div className="app-dashboard bn h-full min-h-full flex flex-col bg-cream text-ink">
       <header className="app-header bg-gradient-to-br from-sky-500 via-sky-400 to-sky-600 text-ink px-6 pt-10 pb-6 rounded-b-[30px] shadow-soft">
@@ -123,7 +177,7 @@ export default function DriverHome() {
         <div className="mt-5 flex items-center justify-between rounded-2xl bg-white/30 backdrop-blur-sm border border-white/40 px-3 py-2 shadow-soft">
           <div>
             <p className="text-[10px] uppercase tracking-[0.18em] text-ink/70">সময়সূচি</p>
-            <p className="text-xl font-bold">{user?.verificationStatus === 'approved' ? `${rides.filter((ride) => ride.status === 'accepted').length} সক্রিয় যাত্রা` : 'যাচাই অপেক্ষমাণ'}</p>
+            <p className="text-xl font-bold">{user?.verificationStatus === 'approved' ? `${displayRides.filter((ride) => ['accepted', 'arrived', 'in_progress'].includes(ride.status)).length} সক্রিয় যাত্রা` : 'যাচাই অপেক্ষমাণ'}</p>
           </div>
           <span className="metric-pill">🚕 সক্রিয়</span>
         </div>
@@ -188,11 +242,11 @@ export default function DriverHome() {
           <section className="space-y-4">
             <div className="app-card p-4">
               <h2 className="text-lg font-bold mb-3">আমার সময়সূচি</h2>
-              {rides.length === 0 ? (
+              {displayRides.length === 0 ? (
                 <p className="text-sm text-ink/60">গৃহীত যাত্রাগুলো আপনার সংগঠিত ভ্রমণ সময়সূচিতে দেখানো হবে।</p>
               ) : (
                 <div className="space-y-3">
-                  {rides
+                  {displayRides
                     .slice()
                     .sort((a, b) => new Date(a.requestedTime || a.createdAt) - new Date(b.requestedTime || b.createdAt))
                     .map((ride) => (
@@ -204,6 +258,18 @@ export default function DriverHome() {
                         <p className="text-xs text-ink/60 mt-2">{formatTime(ride.requestedTime || ride.createdAt)} • {ride.seats || 1} সিট</p>
                         <p className="text-xs text-ink/60 mt-1">যাত্রী: {ride.passengers?.map((item) => item.name).join(', ') || 'যাত্রী(গণ)'}</p>
                         {ride.status === 'accepted' && (
+                          <div className="grid grid-cols-2 gap-2 mt-3">
+                            <button onClick={() => updateRideStatus(ride, 'arrived')} className="primary-btn py-3 text-xs uppercase tracking-[0.12em]">পৌঁছেছি</button>
+                            <button onClick={() => cancelAcceptedRide(ride)} className="secondary-btn py-3 text-xs uppercase tracking-[0.10em]">বাতিল করুন</button>
+                          </div>
+                        )}
+                        {ride.status === 'arrived' && (
+                          <div className="grid grid-cols-2 gap-2 mt-3">
+                            <button onClick={() => updateRideStatus(ride, 'in_progress')} className="primary-btn py-3 text-xs uppercase tracking-[0.12em]">যাত্রা শুরু</button>
+                            <button onClick={() => cancelAcceptedRide(ride)} className="secondary-btn py-3 text-xs uppercase tracking-[0.10em]">বাতিল করুন</button>
+                          </div>
+                        )}
+                        {ride.status === 'in_progress' && (
                           <button onClick={() => complete(ride)} className="primary-btn w-full mt-3 py-3 text-xs uppercase tracking-[0.14em]">সম্পন্ন করুন</button>
                         )}
                       </div>

@@ -24,7 +24,7 @@ async function saveRecord(client, kind, record, ignoreConflict = false) {
   const values = [String(record.id),JSON.stringify(record),...table.values(record)]
   const placeholders = values.map((_,i)=>`$${i+1}`)
   const updates = ['data',...table.columns].map((column)=>`${column}=EXCLUDED.${column}`)
-  const conflict = ignoreConflict ? 'DO NOTHING' : `DO UPDATE SET ${updates.join(',')}, updated_at=NOW()`
+  const conflict = ignoreConflict ? 'DO NOTHING' : `DO UPDATE SET ${updates.join(',')}, updated_at=NOW() WHERE EXCLUDED.data ? 'updatedAt' AND COALESCE(NULLIF(${table.name}.data->>'updatedAt','')::timestamptz, 'epoch'::timestamptz) <= NULLIF(EXCLUDED.data->>'updatedAt','')::timestamptz`
   await client.query(
     `INSERT INTO ${table.name} (${columns.join(',')},updated_at) VALUES (${placeholders.join(',')},NOW()) ON CONFLICT (id) ${conflict}`,
     values,
@@ -64,22 +64,57 @@ export async function initializeDatabase() {
   console.log('PostgreSQL ready. Record counts:', await checkDatabase())
 }
 
-export async function readDb() {
-  const [students,drivers,rides] = await Promise.all([
-    pool.query('SELECT data FROM cuetgo_students ORDER BY updated_at DESC'),
-    pool.query('SELECT data FROM cuetgo_drivers ORDER BY updated_at DESC'),
-    pool.query('SELECT data FROM cuetgo_rides ORDER BY updated_at DESC'),
+async function loadDb(queryable) {
+  const [students, drivers, rides] = await Promise.all([
+    queryable.query('SELECT data FROM cuetgo_students ORDER BY updated_at DESC'),
+    queryable.query('SELECT data FROM cuetgo_drivers ORDER BY updated_at DESC'),
+    queryable.query('SELECT data FROM cuetgo_rides ORDER BY updated_at DESC'),
   ])
-  return { students:students.rows.map(r=>r.data), drivers:drivers.rows.map(r=>r.data), rides:rides.rows.map(r=>r.data) }
+  return {
+    students: students.rows.map((row) => row.data),
+    drivers: drivers.rows.map((row) => row.data),
+    rides: rides.rows.map((row) => row.data),
+  }
+}
+
+async function persistDb(queryable, data) {
+  for (const kind of Object.keys(TABLES)) {
+    for (const record of (Array.isArray(data[kind]) ? data[kind] : [])) {
+      await saveRecord(queryable, kind, record)
+    }
+  }
+}
+
+export async function readDb() {
+  return loadDb(pool)
+}
+
+// All application writes use the same transaction-scoped advisory lock. This
+// prevents two concurrent ride joins/acceptances from overwriting each other.
+export async function mutateDb(mutator) {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    await client.query('SELECT pg_advisory_xact_lock($1)', [72419031])
+    const data = await loadDb(client)
+    const result = await mutator(data)
+    await persistDb(client, data)
+    await client.query('COMMIT')
+    return result
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
 }
 
 export async function writeDb(data) {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
-    for (const kind of Object.keys(TABLES)) {
-      for (const record of (Array.isArray(data[kind]) ? data[kind] : [])) await saveRecord(client,kind,record)
-    }
+    await client.query('SELECT pg_advisory_xact_lock($1)', [72419031])
+    await persistDb(client, data)
     await client.query('COMMIT')
   } catch (error) {
     await client.query('ROLLBACK')

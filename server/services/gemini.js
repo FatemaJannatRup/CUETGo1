@@ -15,10 +15,9 @@ function routeSimilarity(a, b) {
 function scoreCandidate(target, candidate) {
   const gap = minutesApart(target, candidate)
   const route = routeSimilarity(target, candidate)
-  if (!Number.isFinite(gap) || gap > 45 || route === 0) return null
-  const seats = Number(target.seats || 1) + Number(candidate.seats || 1)
-  if (seats > 2) return null
-  const timeScore = Math.max(0, 40 - gap)
+  if (!Number.isFinite(gap) || gap > 10 || route !== 100) return null
+  if (Number(target.seats || 1) !== 1 || Number(candidate.seats || 1) >= 2) return null
+  const timeScore = Math.max(0, 20 - gap * 2)
   return {
     rideId: candidate.id,
     score: Math.round(route * 0.6 + timeScore),
@@ -35,9 +34,9 @@ function scoreCandidate(target, candidate) {
  * Gemini may refine the explanations/ranking, but its output is validated against this
  * deterministic candidate set. The local scorer always works without an API key.
  */
-export async function findMatches(target, candidates) {
+export async function findMatches(target, candidates, options = {}) {
   const pool = candidates
-    .filter((c) => c.id !== target.id && c.status === 'pending')
+    .filter((c) => c.id !== target.id && ['pending', 'accepted', 'arrived'].includes(c.status))
     .map((candidate) => scoreCandidate(target, candidate))
     .filter(Boolean)
     .sort((a, b) => b.score - a.score)
@@ -45,15 +44,16 @@ export async function findMatches(target, candidates) {
 
   if (!pool.length) return []
   const key = process.env.GEMINI_API_KEY
-  if (!key) return pool
+  if (!key || options.useAI === false) return pool
 
   const allowed = new Set(pool.map((item) => item.rideId))
   const prompt = `You are assisting a campus shared-rickshaw service. Rank only the supplied feasible candidate ride IDs. Consider same/shared pickup or destination, requested time proximity, and seat capacity already checked by the system. Do not invent IDs or claim a route is feasible if it is not. Return ONLY JSON: [{"rideId":"...","reason":"short explanation"}]. Candidates: ${JSON.stringify(pool)}`
 
   try {
-    const res = await fetch(GEMINI_URL(key), {
+    const res = await fetch(GEMINI_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+      signal: AbortSignal.timeout(5000),
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
     })
     if (!res.ok) throw new Error(`Gemini returned HTTP ${res.status}`)
@@ -86,9 +86,10 @@ export async function optimizeSharedRoute(rides) {
   if (key) {
     const prompt = `Optimize the order of these CUET campus locations for one shared rickshaw trip. Return ONLY a JSON array of location names, using every supplied location exactly once and no other names. Prefer an order that serves shared route endpoints efficiently. Locations: ${JSON.stringify(stops)}. Ride legs (each pickup must occur before its own dropoff): ${JSON.stringify(rides.map((r) => ({ from: r.from, to: r.to })))}`
     try {
-      const res = await fetch(GEMINI_URL(key), {
+      const res = await fetch(GEMINI_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+        signal: AbortSignal.timeout(5000),
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
       })
       if (!res.ok) throw new Error(`Gemini returned HTTP ${res.status}`)

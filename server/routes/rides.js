@@ -1,23 +1,27 @@
 import { Router } from 'express'
 import crypto from 'crypto'
-import { readDb, writeDb } from '../db.js'
+import { readDb, mutateDb } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
 import { findMatches, optimizeSharedRoute } from '../services/gemini.js'
 
 const router = Router()
+const BOOKING_CUTOFF_MS = 2 * 60 * 1000
+const MATCH_WINDOW_MS = 10 * 60 * 1000
+const STUDENT_CONFLICT_WINDOW_MS = 15 * 60 * 1000
+const DRIVER_BUFFER_MS = 15 * 60 * 1000
 
 async function requireApprovedDriver(req, res, next) {
   try {
-  const db = await readDb()
-  const driver = db.drivers.find((item) => item.id === req.user.id)
-  if (!driver) return res.status(404).json({ message: 'Driver account not found.' })
-  if (driver.verificationStatus === 'rejected') {
-    return res.status(403).json({ message: 'Your driver application was rejected. Please contact CUETGo support.' })
-  }
-  if (driver.verificationStatus !== 'approved') {
-    return res.status(403).json({ message: 'Your driver account is awaiting administrator approval.' })
-  }
-  next()
+    const db = await readDb()
+    const driver = db.drivers.find((item) => item.id === req.user.id)
+    if (!driver) return res.status(404).json({ message: 'Driver account not found.' })
+    if (driver.verificationStatus === 'rejected') {
+      return res.status(403).json({ message: 'Your driver application was rejected. Please contact CUETGo support.' })
+    }
+    if (driver.verificationStatus !== 'approved') {
+      return res.status(403).json({ message: 'Your driver account is awaiting administrator approval.' })
+    }
+    next()
   } catch (error) { next(error) }
 }
 
@@ -28,178 +32,366 @@ const HALLS = [
 ]
 const LOCATIONS = [...HALLS, 'CUET Main Gate', 'Academic Building', 'Central Library', 'Cafeteria']
 
-function fareFor(from, to) {
+function fail(status, message) {
+  const error = new Error(message)
+  error.status = status
+  return error
+}
+
+function farePerSeat(from, to) {
   if (HALLS.includes(from) && HALLS.includes(to)) return 20
   if (HALLS.includes(from)) return 30
   return 25
 }
 
-function studentName(db, studentId) {
-  const s = db.students.find((x) => x.id === studentId)
-  return s ? s.name : 'Student'
+function pickupTime(ride) {
+  return new Date(ride.requestedTime || ride.createdAt).getTime()
+}
+
+function isBeforeCutoff(ride, now = Date.now()) {
+  return pickupTime(ride) - now > BOOKING_CUTOFF_MS
+}
+
+function occupiedSeats(ride) {
+  if (Array.isArray(ride.passengers) && ride.passengers.length) {
+    return ride.passengers.reduce((sum, passenger) => sum + Math.max(1, Number(passenger.seatCount || 1)), 0)
+  }
+  return Math.max(1, Number(ride.seats || 1))
 }
 
 function normalizePassengers(ride, fallbackStudent) {
   if (Array.isArray(ride.passengers) && ride.passengers.length) return ride.passengers
-  return [{ studentId: ride.studentId || fallbackStudent?.id, name: fallbackStudent?.name || 'Student', phone: '', info: 'Primary rider', seatCount: Number(ride.seats || 1), isGuest: false }]
+  return [{
+    studentId: ride.studentId || fallbackStudent?.id,
+    name: fallbackStudent?.name || 'Student',
+    phone: String(fallbackStudent?.phone || ''),
+    info: 'Primary rider',
+    seatCount: Math.max(1, Number(ride.seats || 1)),
+    isGuest: false,
+  }]
+}
+
+function recalculateRide(ride) {
+  const passengers = Array.isArray(ride.passengers) ? ride.passengers : []
+  const seats = passengers.reduce((sum, passenger) => sum + Math.max(1, Number(passenger.seatCount || 1)), 0)
+  ride.seats = seats
+  ride.passengerCount = seats
+  ride.farePerSeat = farePerSeat(ride.from, ride.to)
+  ride.fare = ride.farePerSeat * seats
+}
+
+function studentIsOnRide(ride, studentId) {
+  return ride.studentId === studentId ||
+    (Array.isArray(ride.passengers) && ride.passengers.some((passenger) => passenger.studentId === studentId))
+}
+
+function hasStudentTimeConflict(db, studentId, requestedAt, exceptRideId = null) {
+  return db.rides.some((ride) => {
+    if (ride.id === exceptRideId || !['pending', 'accepted', 'arrived', 'in_progress'].includes(ride.status)) return false
+    if (!studentIsOnRide(ride, studentId)) return false
+    return Math.abs(pickupTime(ride) - requestedAt) < STUDENT_CONFLICT_WINDOW_MS
+  })
+}
+
+function sameRoute(a, b) {
+  return a.from === b.from && a.to === b.to
+}
+
+function assignedRideGroup(db, target, driverId) {
+  if (!target.sharedGroupId) return [target]
+  return db.rides.filter((ride) => ride.sharedGroupId === target.sharedGroupId && ride.driverId === driverId)
+}
+
+function validSharedGroup(rides) {
+  if (!Array.isArray(rides) || rides.length < 1 || rides.length > 2) return false
+  if (!rides.every((ride) => sameRoute(ride, rides[0]))) return false
+  const times = rides.map(pickupTime)
+  if (Math.max(...times) - Math.min(...times) > MATCH_WINDOW_MS) return false
+  return rides.reduce((sum, ride) => sum + occupiedSeats(ride), 0) <= 2
+}
+
+function studentName(db, studentId) {
+  const student = db.students.find((item) => item.id === studentId)
+  return student ? (student.username || student.name) : 'Student'
+}
+
+async function readDbAndExpirePending() {
+  const snapshot = await readDb()
+  const now = Date.now()
+  const hasExpired = snapshot.rides.some((ride) => ride.status === 'pending' && pickupTime(ride) <= now)
+  if (!hasExpired) return snapshot
+  return mutateDb((db) => {
+    const expiredAt = new Date().toISOString()
+    for (const ride of db.rides) {
+      if (ride.status === 'pending' && pickupTime(ride) <= now) {
+        ride.status = 'expired'
+        ride.expiredAt = expiredAt
+        ride.updatedAt = expiredAt
+      }
+    }
+    return db
+  })
 }
 
 router.get('/routes', (req, res) => {
   res.json({ locations: LOCATIONS, halls: HALLS })
 })
 
+// Students can see both unassigned and driver-accepted rides while the group
+// still has a seat. No passenger may join during the final two minutes.
 router.get('/open', requireAuth('student'), async (req, res) => {
-  const db = await readDb()
+  const db = await readDbAndExpirePending()
+  const now = Date.now()
   const rides = db.rides
-    .filter((ride) => ride.status === 'pending' && ride.studentId !== req.user.id)
+    .filter((ride) =>
+      ['pending', 'accepted', 'arrived'].includes(ride.status) &&
+      pickupTime(ride) > now + BOOKING_CUTOFF_MS &&
+      occupiedSeats(ride) < 2 &&
+      !studentIsOnRide(ride, req.user.id)
+    )
     .map((ride) => {
-      const student = db.students.find((s) => s.id === ride.studentId)
+      const host = db.students.find((student) => student.id === ride.studentId)
+      const passengers = normalizePassengers(ride, host)
+      const seatsUsed = occupiedSeats({ ...ride, passengers })
       return {
         ...ride,
-        hostName: student?.name || 'Campus rider',
-        hostGender: student?.gender || 'unknown',
-        seatsLeft: Math.max(0, 2 - Number(ride.seats || 1)),
-        passengers: normalizePassengers(ride, student),
+        hostName: host?.username || host?.name || 'Campus rider',
+        hostGender: host?.gender || 'unknown',
+        seats: seatsUsed,
+        seatsLeft: Math.max(0, 2 - seatsUsed),
+        passengers,
+        bookingClosesAt: new Date(pickupTime(ride) - BOOKING_CUTOFF_MS).toISOString(),
       }
     })
-    .sort((a, b) => new Date(a.requestedTime || a.createdAt) - new Date(b.requestedTime || b.createdAt))
-
+    .sort((a, b) => pickupTime(a) - pickupTime(b))
   res.json({ rides })
 })
 
 router.post('/request', requireAuth('student'), async (req, res) => {
   const { from, to, requestedTime, seats = 1, coPassengerName = '', coPassengerPhone = '', coPassengerInfo = '' } = req.body || {}
-  if (!LOCATIONS.includes(from) || !LOCATIONS.includes(to) || from === to) return res.status(400).json({ message: 'Choose two different CUET locations.' })
-  if (!requestedTime || Number.isNaN(new Date(requestedTime).getTime())) return res.status(400).json({ message: 'Choose a pickup time.' })
+  if (!LOCATIONS.includes(from) || !LOCATIONS.includes(to) || from === to) {
+    return res.status(400).json({ message: 'Choose two different CUET locations.' })
+  }
+  const requestedAt = Date.parse(requestedTime)
+  if (!Number.isFinite(requestedAt)) return res.status(400).json({ message: 'Choose a valid pickup time.' })
+  if (requestedAt - Date.now() <= BOOKING_CUTOFF_MS) {
+    return res.status(400).json({ message: 'Bookings close 2 minutes before pickup. Choose a later time.' })
+  }
   const seatCount = Number(seats)
   if (![1, 2].includes(seatCount)) return res.status(400).json({ message: 'A rickshaw has only 1 or 2 seats.' })
-  if (seatCount === 2 && (!coPassengerName || !coPassengerName.trim() || !coPassengerPhone || !String(coPassengerPhone).trim())) {
-    return res.status(400).json({ message: 'For 2-seat rides, add the companion name and phone number.' })
+  if (seatCount === 2 && (!String(coPassengerName).trim() || !String(coPassengerPhone).trim())) {
+    return res.status(400).json({ message: 'For 2 seats, add the companion name and phone number.' })
   }
 
-  const db = await readDb()
-  const student = db.students.find((s) => s.id === req.user.id)
-  if (!student) return res.status(404).json({ message: 'Student account not found.' })
+  const ride = await mutateDb((db) => {
+    // Recheck after acquiring the transaction lock: a request can wait in the
+    // queue long enough to cross the two-minute cutoff.
+    if (requestedAt - Date.now() <= BOOKING_CUTOFF_MS) {
+      throw fail(409, 'Bookings close 2 minutes before pickup. Choose a later time.')
+    }
+    const student = db.students.find((item) => item.id === req.user.id)
+    if (!student) throw fail(404, 'Student account not found.')
+    if (hasStudentTimeConflict(db, req.user.id, requestedAt)) {
+      throw fail(409, 'You already have another ride close to this pickup time. Cancel it or choose a different time.')
+    }
 
-  const ride = {
-    id: crypto.randomUUID(),
-    studentId: req.user.id,
-    from,
-    to,
-    fare: fareFor(from, to) * seatCount,
-    requestedTime: new Date(requestedTime).toISOString(),
-    seats: seatCount,
-    passengerCount: seatCount,
-    status: 'pending',
-    driverId: null,
-    matchedRideIds: [],
-    passengers: [{
+    const created = {
+      id: crypto.randomUUID(),
       studentId: student.id,
-      name: student.name,
-      phone: String(student.phone || ''),
-      info: 'Primary rider',
-      seatCount: seatCount === 2 ? 1 : seatCount,
-      isGuest: false,
-    }],
-    coPassenger: seatCount === 2 ? {
-      name: String(coPassengerName).trim(),
-      phone: String(coPassengerPhone).trim(),
-      info: coPassengerInfo || 'Companion passenger',
-    } : null,
-    createdAt: new Date().toISOString(),
-  }
+      from,
+      to,
+      farePerSeat: farePerSeat(from, to),
+      fare: farePerSeat(from, to) * seatCount,
+      requestedTime: new Date(requestedAt).toISOString(),
+      seats: seatCount,
+      passengerCount: seatCount,
+      status: 'pending',
+      driverId: null,
+      matchedRideIds: [],
+      passengers: [{
+        studentId: student.id,
+        name: student.username || student.name,
+        phone: String(student.phone || ''),
+        info: 'Primary rider',
+        seatCount: 1,
+        isGuest: false,
+      }],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
 
-  if (seatCount === 2) {
-    ride.passengers.push({
-      studentId: `guest-${crypto.randomUUID()}`,
-      name: String(coPassengerName).trim(),
-      phone: String(coPassengerPhone).trim(),
-      info: coPassengerInfo || 'Companion passenger',
-      seatCount: 1,
-      isGuest: true,
-    })
-  }
+    if (seatCount === 2) {
+      created.passengers.push({
+        studentId: 'guest-' + crypto.randomUUID(),
+        name: String(coPassengerName).trim(),
+        phone: String(coPassengerPhone).trim(),
+        info: String(coPassengerInfo || 'Companion passenger').trim(),
+        seatCount: 1,
+        isGuest: true,
+      })
+    }
 
-  db.rides.push(ride)
+    db.rides.push(created)
+    return created
+  })
 
-  const others = db.rides.filter((r) => r.status === 'pending' && r.id !== ride.id && Math.abs(new Date(r.requestedTime || r.createdAt) - new Date(ride.requestedTime)) <= 45 * 60 * 1000 && (Number(r.seats || 1) + ride.seats) <= 2)
-  const matches = await findMatches(ride, others)
-  ride.matchedRideIds = matches.map((m) => m.rideId)
-  ride.matchDetails = matches
-  await writeDb(db)
+  // Candidate discovery is intentionally outside the DB transaction. Gemini
+  // can never hold a seat lock or block a booking if its API is slow.
+  const db = await readDb()
+  const candidates = db.rides.filter((candidate) =>
+    candidate.id !== ride.id &&
+    ['pending', 'accepted', 'arrived'].includes(candidate.status) &&
+    occupiedSeats(candidate) < 2 &&
+    pickupTime(candidate) > Date.now() + BOOKING_CUTOFF_MS
+  )
+  const matches = await findMatches(ride, candidates)
+  const matchDetails = matches.map((match) => {
+    const candidate = candidates.find((item) => item.id === match.rideId)
+    return candidate ? {
+      rideId: candidate.id,
+      reason: match.reason,
+      route: candidate.from + ' → ' + candidate.to,
+      time: candidate.requestedTime,
+      seatsLeft: 2 - occupiedSeats(candidate),
+    } : null
+  }).filter(Boolean)
 
-  const matchedRiders = ride.matchedRideIds
-    .map((id) => db.rides.find((r) => r.id === id))
-    .filter(Boolean)
-    .map((r) => ({ name: studentName(db, r.studentId), route: `${r.from} → ${r.to}`, time: r.requestedTime || r.createdAt }))
-
-  res.json({ ride, matches: matchedRiders })
+  res.status(201).json({ ride, matches: matchDetails })
 })
 
 router.post('/:id/join', requireAuth('student'), async (req, res) => {
   const seatCount = Number(req.body?.seats || 1)
   if (![1, 2].includes(seatCount)) return res.status(400).json({ message: 'Choose 1 or 2 seats.' })
-  const db = await readDb()
-  const ride = db.rides.find((r) => r.id === req.params.id && r.status === 'pending' && r.studentId !== req.user.id)
-  if (!ride) return res.status(404).json({ message: 'Open ride not found.' })
-  if ((Number(ride.seats) || 1) + seatCount > 2) {
-    return res.status(409).json({ message: 'This ride no longer has enough space for that many seats.' })
-  }
 
-  const student = db.students.find((s) => s.id === req.user.id)
-  if (!student) return res.status(404).json({ message: 'Student account not found.' })
+  const ride = await mutateDb((db) => {
+    const target = db.rides.find((item) => item.id === req.params.id)
+    if (!target || !['pending', 'accepted', 'arrived'].includes(target.status)) {
+      throw fail(404, 'This shared ride is no longer available.')
+    }
+    if (!isBeforeCutoff(target)) throw fail(409, 'This ride is closed. Bookings close 2 minutes before pickup.')
+    if (studentIsOnRide(target, req.user.id)) throw fail(409, 'You are already part of this ride.')
+    const seatsUsed = occupiedSeats(target)
+    if (seatsUsed + seatCount > 2) throw fail(409, 'There are not enough empty seats left.')
 
-  if (!Array.isArray(ride.passengers)) ride.passengers = [{ studentId: ride.studentId, name: studentName(db, ride.studentId), phone: '', info: 'Primary rider', seatCount: Number(ride.seats || 1), isGuest: false }]
-  ride.passengers.push({
-    studentId: student.id,
-    name: student.name,
-    phone: String(req.body?.phone || ''),
-    info: 'Joined ride',
-    seatCount,
-    isGuest: false,
+    const student = db.students.find((item) => item.id === req.user.id)
+    if (!student) throw fail(404, 'Student account not found.')
+
+    // If this student already created a matching one-seat request, pool it into
+    // this ride atomically instead of making them cancel manually.
+    const ownRequest = db.rides.find((item) =>
+      item.id !== target.id &&
+      item.studentId === student.id &&
+      item.status === 'pending' &&
+      sameRoute(item, target) &&
+      Math.abs(pickupTime(item) - pickupTime(target)) <= MATCH_WINDOW_MS &&
+      occupiedSeats(item) === 1
+    )
+    if (ownRequest) {
+      ownRequest.status = 'cancelled'
+      ownRequest.cancelledAt = new Date().toISOString()
+      ownRequest.cancelledBy = 'student-pooled'
+      ownRequest.updatedAt = ownRequest.cancelledAt
+    }
+
+    if (hasStudentTimeConflict(db, req.user.id, pickupTime(target))) {
+      throw fail(409, 'You already have another ride close to this pickup time.')
+    }
+
+    target.passengers = normalizePassengers(target, db.students.find((item) => item.id === target.studentId))
+    target.passengers.push({
+      studentId: student.id,
+      name: student.username || student.name,
+      phone: String(req.body?.phone || student.phone || ''),
+      info: 'Joined ride',
+      seatCount,
+      isGuest: false,
+      joinedAt: new Date().toISOString(),
+    })
+    recalculateRide(target)
+    target.updatedAt = new Date().toISOString()
+    return target
   })
-  ride.seats = Number(ride.seats || 1) + seatCount
-  ride.passengerCount = Number(ride.passengerCount || ride.seats || 1) + seatCount
-  ride.fare = fareFor(ride.from, ride.to) * Math.max(1, Number(ride.seats || 1))
-  await writeDb(db)
-  res.json({ ride, joined: true })
+
+  res.json({ ride, joined: true, seatsLeft: Math.max(0, 2 - occupiedSeats(ride)) })
+})
+
+// A passenger can cancel only before the two-minute lock. If the ride owner
+// leaves but another registered passenger remains, ownership transfers to them.
+router.post('/:id/cancel', requireAuth('student'), async (req, res) => {
+  const result = await mutateDb((db) => {
+    const ride = db.rides.find((item) => item.id === req.params.id)
+    if (!ride || !['pending', 'accepted', 'arrived'].includes(ride.status)) throw fail(404, 'Active ride not found.')
+    if (!isBeforeCutoff(ride)) throw fail(409, 'Passenger changes are locked 2 minutes before pickup.')
+    const passengers = normalizePassengers(ride, db.students.find((item) => item.id === ride.studentId))
+    if (!passengers.some((passenger) => passenger.studentId === req.user.id)) {
+      throw fail(403, 'You are not a passenger on this ride.')
+    }
+
+    if (ride.studentId === req.user.id) {
+      ride.passengers = passengers.filter((passenger) => !passenger.isGuest && passenger.studentId !== req.user.id)
+      if (ride.passengers.length) {
+        ride.studentId = ride.passengers[0].studentId
+      }
+    } else {
+      ride.passengers = passengers.filter((passenger) => passenger.studentId !== req.user.id)
+    }
+
+    if (!ride.passengers.length) {
+      ride.status = 'cancelled'
+      ride.cancelledAt = new Date().toISOString()
+      ride.cancelledBy = 'student'
+      ride.driverId = null
+    } else {
+      recalculateRide(ride)
+    }
+    ride.updatedAt = new Date().toISOString()
+    return { ride, cancelled: true }
+  })
+  res.json({ ride: result.ride, cancelled: true })
 })
 
 router.get('/mine', requireAuth('student'), async (req, res) => {
-  const db = await readDb()
+  const db = await readDbAndExpirePending()
   const mine = db.rides
-    .filter((r) => r.studentId === req.user.id || (Array.isArray(r.passengers) && r.passengers.some((p) => p.studentId === req.user.id)))
+    .filter((ride) => studentIsOnRide(ride, req.user.id))
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-  res.json({ rides: mine })
+
+  const withMatches = await Promise.all(mine.map(async (ride) => {
+    if (!['pending', 'accepted', 'arrived'].includes(ride.status) || !isBeforeCutoff(ride)) return ride
+    const candidates = db.rides.filter((candidate) =>
+      candidate.id !== ride.id &&
+      ['pending', 'accepted', 'arrived'].includes(candidate.status) &&
+      occupiedSeats(candidate) < 2 &&
+      pickupTime(candidate) > Date.now() + BOOKING_CUTOFF_MS
+    )
+    const matches = await findMatches(ride, candidates, { useAI: false })
+    return { ...ride, matchDetails: matches }
+  }))
+  res.json({ rides: withMatches })
 })
 
 router.get('/pending', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
-  const db = await readDb()
+  const db = await readDbAndExpirePending()
   const pending = db.rides
-    .filter((r) => r.status === 'pending')
-    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+    .filter((ride) => ride.status === 'pending' && pickupTime(ride) > Date.now())
+    .sort((a, b) => pickupTime(a) - pickupTime(b))
 
   const groups = []
   for (const ride of pending) {
-    const rideTime = new Date(ride.requestedTime || ride.createdAt).getTime()
-    const rideSeats = Number(ride.seats || 1)
-    const compatible = groups.find((group) => {
-      const timeGap = Math.abs(new Date(group.requestedTime).getTime() - rideTime)
-      const currentSeats = group.rideIds.reduce((sum, id) => {
-        const item = pending.find((candidate) => candidate.id === id)
-        return sum + Number(item?.seats || 1)
-      }, 0)
-      const sharesEndpoint = group.rideIds.some((id) => {
-        const item = pending.find((candidate) => candidate.id === id)
-        return item && (item.from === ride.from || item.to === ride.to || item.from === ride.to || item.to === ride.from)
-      })
-      return sharesEndpoint && timeGap <= 20 * 60 * 1000 && currentSeats + rideSeats <= 2
+    const seats = occupiedSeats(ride)
+    const group = groups.find((candidate) => {
+      if (!sameRoute(candidate, ride)) return false
+      const all = candidate.rideIds.map((id) => pending.find((item) => item.id === id)).filter(Boolean)
+      return all.length < 2 &&
+        Math.abs(pickupTime(candidate) - pickupTime(ride)) <= MATCH_WINDOW_MS &&
+        all.reduce((sum, item) => sum + occupiedSeats(item), 0) + seats <= 2
     })
 
-    if (compatible) {
-      compatible.rideIds.push(ride.id)
-      compatible.riders += Number(ride.passengerCount || ride.seats || 1)
-      compatible.fare += Number(ride.fare || 0)
+    if (group) {
+      group.rideIds.push(ride.id)
+      group.riders += seats
+      group.fare += Number(ride.fare || 0)
+      group.requestedTime = new Date(Math.min(pickupTime({ requestedTime: group.requestedTime }), pickupTime(ride))).toISOString()
     } else {
       groups.push({
         key: ride.id,
@@ -207,7 +399,7 @@ router.get('/pending', requireAuth('driver'), requireApprovedDriver, async (req,
         to: ride.to,
         fare: Number(ride.fare || 0),
         rideIds: [ride.id],
-        riders: Number(ride.passengerCount || ride.seats || 1),
+        riders: seats,
         time: ride.createdAt,
         requestedTime: ride.requestedTime || ride.createdAt,
       })
@@ -218,71 +410,147 @@ router.get('/pending', requireAuth('driver'), requireApprovedDriver, async (req,
 
 router.post('/optimize', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
   const rideIds = Array.isArray(req.body?.rideIds) ? [...new Set(req.body.rideIds)] : []
-  if (!rideIds.length || rideIds.length > 2) return res.status(400).json({ message: 'Select one shared ride group to optimize.' })
+  if (!rideIds.length || rideIds.length > 2) throw fail(400, 'Select one shared ride group to optimize.')
   const db = await readDb()
   const selected = rideIds.map((id) => db.rides.find((ride) => ride.id === id && ride.status === 'pending')).filter(Boolean)
-  if (selected.length !== rideIds.length) return res.status(409).json({ message: 'One or more ride requests are no longer available.' })
-  const totalSeats = selected.reduce((sum, ride) => sum + Number(ride.seats || 1), 0)
-  if (totalSeats > 2) return res.status(409).json({ message: 'A rickshaw can carry a maximum of two passengers.' })
+  if (selected.length !== rideIds.length || !validSharedGroup(selected)) {
+    throw fail(409, 'These requests are no longer a feasible shared ride group.')
+  }
   const plan = await optimizeSharedRoute(selected)
   res.json({ ...plan, legs: selected.map((ride) => ({ from: ride.from, to: ride.to })) })
 })
 
 router.post('/accept', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
-  const { rideIds } = req.body || {}
-  if (!Array.isArray(rideIds) || rideIds.length === 0) {
-    return res.status(400).json({ message: 'No ride selected.' })
+  const selectedRideIds = Array.isArray(req.body?.rideIds) ? [...new Set(req.body.rideIds)] : []
+  if (!selectedRideIds.length || selectedRideIds.length > 2) {
+    throw fail(400, 'Select one ride or one compatible two-request group.')
   }
 
-  const db = await readDb()
-  const selectedRideIds = [...new Set(rideIds)]
-  const acceptedByDriver = db.rides.filter((ride) => ride.driverId === req.user.id && ['accepted', 'completed'].includes(ride.status))
-
-  for (const rideId of selectedRideIds) {
-    const ride = db.rides.find((item) => item.id === rideId)
-    if (!ride || ride.status !== 'pending') {
-      return res.status(409).json({ message: 'One or more rides are no longer available.' })
+  const accepted = await mutateDb((db) => {
+    const selected = selectedRideIds.map((id) => db.rides.find((ride) => ride.id === id))
+    if (selected.some((ride) => !ride || ride.status !== 'pending')) {
+      throw fail(409, 'One or more rides are no longer available.')
+    }
+    if (!validSharedGroup(selected)) {
+      throw fail(409, 'These requests cannot share one rickshaw. They must have the same route, be within 10 minutes, and use no more than two seats.')
+    }
+    if (selected.some((ride) => pickupTime(ride) <= Date.now())) {
+      throw fail(409, 'This pickup time has already passed.')
     }
 
-    const selectedTime = new Date(ride.requestedTime || ride.createdAt).getTime()
-    const hasConflict = acceptedByDriver.some((existingRide) => {
-      const existingTime = new Date(existingRide.requestedTime || existingRide.createdAt).getTime()
-      return Math.abs(existingTime - selectedTime) < 45 * 60 * 1000
-    })
+    const existing = db.rides.filter((ride) =>
+      ride.driverId === req.user.id && ['accepted', 'arrived', 'in_progress'].includes(ride.status) &&
+      !selectedRideIds.includes(ride.id)
+    )
+    const conflict = selected.some((ride) => existing.some((current) =>
+      Math.abs(pickupTime(current) - pickupTime(ride)) < DRIVER_BUFFER_MS
+    ))
+    if (conflict) throw fail(409, 'This request overlaps with another accepted trip in your schedule.')
 
-    if (hasConflict) {
-      return res.status(409).json({ message: 'This ride overlaps with an already accepted trip in your schedule.' })
+    const sharedGroupId = crypto.randomUUID()
+    for (const ride of selected) {
+      ride.status = 'accepted'
+      ride.driverId = req.user.id
+      ride.sharedGroupId = sharedGroupId
+      ride.acceptedAt = new Date().toISOString()
+      ride.updatedAt = ride.acceptedAt
     }
-  }
+    return selected.length
+  })
+  res.json({ accepted })
+})
 
-  for (const rideId of selectedRideIds) {
-    const ride = db.rides.find((item) => item.id === rideId)
-    if (!ride || ride.status !== 'pending') continue
-    ride.status = 'accepted'
-    ride.driverId = req.user.id
-    ride.acceptedAt = new Date().toISOString()
-  }
+router.post('/:id/driver-cancel', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
+  const ride = await mutateDb((db) => {
+    const target = db.rides.find((item) =>
+      item.id === req.params.id && item.driverId === req.user.id && ['accepted', 'arrived'].includes(item.status)
+    )
+    if (!target) throw fail(404, 'Accepted ride not found.')
+    const group = assignedRideGroup(db, target, req.user.id)
+    if (group.some((ride) => !['accepted', 'arrived'].includes(ride.status))) {
+      throw fail(409, 'This shared trip has already changed status. Refresh and try again.')
+    }
+    const now = Date.now()
+    const cancelledAt = new Date().toISOString()
+    let reopened = false
+    let replacementNeeded = false
+    for (const ride of group) {
+      ride.driverCancelledAt = cancelledAt
+      ride.driverCancelReason = String(req.body?.reason || '').slice(0, 240)
+      ride.updatedAt = cancelledAt
+      if (pickupTime(ride) <= now) {
+        ride.status = 'cancelled'
+      } else {
+        // Preserve the passenger group after cutoff, but return the trip to the
+        // driver queue so another approved driver can take it before pickup.
+        ride.status = 'pending'
+        ride.driverId = null
+        ride.bookingLocked = pickupTime(ride) - now <= BOOKING_CUTOFF_MS
+        reopened = reopened || !ride.bookingLocked
+        replacementNeeded = true
+      }
+    }
+    return { rides: group, reopened, replacementNeeded }
+  })
+  res.json(ride)
+})
 
-  await writeDb(db)
-  res.json({ accepted: selectedRideIds.length })
+router.post('/:id/status', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
+  const nextStatus = String(req.body?.status || '')
+  if (!['arrived', 'in_progress'].includes(nextStatus)) {
+    throw fail(400, 'Choose arrived or in_progress.')
+  }
+  const ride = await mutateDb((db) => {
+    const target = db.rides.find((item) =>
+      item.id === req.params.id && item.driverId === req.user.id
+    )
+    if (!target) throw fail(404, 'Assigned ride not found.')
+    const group = assignedRideGroup(db, target, req.user.id)
+    const expectedStatus = nextStatus === 'arrived' ? 'accepted' : 'arrived'
+    if (group.some((ride) => ride.status !== expectedStatus)) {
+      throw fail(409, 'The shared trip status has changed. Refresh and try again.')
+    }
+    if (nextStatus === 'in_progress' && group.some((ride) => pickupTime(ride) - Date.now() > BOOKING_CUTOFF_MS)) {
+      throw fail(409, 'The trip can start only after the two-minute booking window has closed.')
+    }
+    const timestamp = new Date().toISOString()
+    for (const ride of group) {
+      ride.status = nextStatus
+      if (nextStatus === 'arrived') ride.arrivedAt = timestamp
+      if (nextStatus === 'in_progress') ride.startedAt = timestamp
+      ride.updatedAt = timestamp
+    }
+    return target
+  })
+  res.json({ ride })
 })
 
 router.post('/:id/complete', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
-  const db = await readDb()
-  const ride = db.rides.find((item) => item.id === req.params.id && item.driverId === req.user.id)
-  if (!ride) return res.status(404).json({ message: 'Ride not found.' })
-
-  ride.status = 'completed'
-  ride.completedAt = new Date().toISOString()
-  ride.paidOut = false
-  await writeDb(db)
+  const ride = await mutateDb((db) => {
+    const target = db.rides.find((item) =>
+      item.id === req.params.id && item.driverId === req.user.id && item.status === 'in_progress'
+    )
+    if (!target) throw fail(404, 'Accepted ride not found.')
+    const group = assignedRideGroup(db, target, req.user.id)
+    if (group.some((ride) => ride.status !== 'in_progress')) {
+      throw fail(409, 'The shared trip status has changed. Refresh and try again.')
+    }
+    const completedAt = new Date().toISOString()
+    for (const ride of group) {
+      ride.status = 'completed'
+      ride.completedAt = completedAt
+      ride.paidOut = false
+      ride.updatedAt = completedAt
+    }
+    return target
+  })
   res.json({ ride })
 })
 
 router.get('/mine-driver', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
-  const db = await readDb()
+  const db = await readDbAndExpirePending()
   const mine = db.rides
-    .filter((r) => r.driverId === req.user.id)
+    .filter((ride) => ride.driverId === req.user.id)
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
   res.json({ rides: mine })
 })
