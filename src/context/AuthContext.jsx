@@ -51,6 +51,14 @@ export function AuthProvider({ children }) {
     } catch (e) { return { ok: false, message: e.message } }
   }
 
+  async function demoLogin(role) {
+    try {
+      const { token, user } = await api.demoLogin(role)
+      persist(token, user)
+      return { ok: true, user }
+    } catch (e) { return { ok: false, message: e.message } }
+  }
+
   async function googleSignup(credential, role, profile) {
     try {
       const { token, user } = await api.googleSignup({ credential, role, profile })
@@ -74,7 +82,7 @@ export function AuthProvider({ children }) {
     setUser(null)
   }
 
-  return <AuthContext.Provider value={{ user, loading, googleLogin, googleSignup, updateProfile, logout }}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={{ user, loading, googleLogin, googleSignup, demoLogin, updateProfile, logout }}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() { return useContext(AuthContext) }
