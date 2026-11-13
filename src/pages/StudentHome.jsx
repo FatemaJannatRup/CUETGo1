@@ -4,7 +4,15 @@ import { api } from '../api.js'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 
 const HALLS = ['Muktijoddha Hall', 'Shahid Mohammad Shah Hall', 'Dr. Qudrat-E-Khuda Hall', 'Kabi Kazi Nazrul Islam Hall', 'Shaheed Tareq Huda Hall', 'Shaheed Abu Sayed Hall', 'Sufia Kamal Hall', 'Begum Shamsunnahar Khan Hall', 'Tapashi Rabeya Hall']
-const formatTime = (value) => new Date(value).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })
+const formatRideDate = (value) => {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? 'Date unavailable' : date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
+}
+const formatRideClock = (value) => {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? 'Time unavailable' : date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
+const formatRideStatus = (status) => String(status || 'pending').replaceAll('_', ' ')
 const toLocalDateTimeInput = (date) => { const pad = (value) => String(value).padStart(2, '0'); return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + 'T' + pad(date.getHours()) + ':' + pad(date.getMinutes()) }
 const formatDateLabel = (date) => date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
 
@@ -384,11 +392,15 @@ export default function StudentHome() {
                     const seatsLeft = Number.isFinite(Number(ride.seatsLeft)) ? Number(ride.seatsLeft) : Math.max(0, 2 - Number(ride.seats || 1))
                     return (
                       <div key={ride.id} className="rounded-2xl border border-sky-100 bg-white p-3 shadow-sm">
-                        <div className="flex justify-between">
-                          <p className="font-bold text-ink">{ride.from} → {ride.to}</p>
-                          <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold uppercase text-emerald-700">{seatsLeft} left</span>
+                        <div className="ride-card-heading">
+                          <p className="ride-route-title">{ride.from} → {ride.to}</p>
+                          <span className="ride-status-pill ride-status-open">{seatsLeft} LEFT</span>
                         </div>
-                        <p className="text-xs text-ink/60 mt-2">{ride.hostName} • {formatTime(ride.requestedTime || ride.createdAt)}</p>
+                        <div className="ride-time-block" aria-label={`Departure ${formatRideDate(ride.requestedTime || ride.createdAt)} at ${formatRideClock(ride.requestedTime || ride.createdAt)}`}>
+                          <span className="ride-time-date">{formatRideDate(ride.requestedTime || ride.createdAt)}</span>
+                          <strong className="ride-time-clock">{formatRideClock(ride.requestedTime || ride.createdAt)}</strong>
+                        </div>
+                        <p className="ride-host-name">{ride.hostName}</p>
                         <p className="text-[11px] text-ink/50 mt-1">{ride.status === 'arrived' ? 'Driver at pickup' : ride.status === 'accepted' ? 'Driver assigned' : ride.driverCancelledAt ? 'Finding a replacement driver' : 'Waiting for a driver'} • Booking closes 2 minutes before pickup</p>
                         <div className="mt-3 flex justify-between items-center">
                           <span className="text-xs text-ink/60">{ride.passengers?.length || 1} rider(s)</span>
@@ -411,11 +423,17 @@ export default function StudentHome() {
                 <div className="space-y-3">
                   {rides.map((ride) => (
                     <div key={ride.id} className="rounded-2xl border border-sky-100 bg-sky-50 p-3">
-                      <div className="flex justify-between items-center">
-                        <p className="font-bold text-ink">{ride.from} → {ride.to}</p>
-                        <span className="rounded-full bg-sky-100 px-2 py-1 text-[10px] font-bold uppercase text-sky-700">{ride.status}</span>
+                      <div className="ride-card-heading">
+                        <p className="ride-route-title">{ride.from} → {ride.to}</p>
+                        <span className="ride-status-pill ride-status-${ride.status}">{formatRideStatus(ride.status)}</span>
                       </div>
-                      <p className="text-xs text-ink/60 mt-2">{formatTime(ride.requestedTime || ride.createdAt)} • {ride.seats || 1} seat(s)</p>
+                      <div className="ride-request-meta">
+                        <div className="ride-time-block" aria-label={`Departure ${formatRideDate(ride.requestedTime || ride.createdAt)} at ${formatRideClock(ride.requestedTime || ride.createdAt)}`}>
+                          <span className="ride-time-date">{formatRideDate(ride.requestedTime || ride.createdAt)}</span>
+                          <strong className="ride-time-clock">{formatRideClock(ride.requestedTime || ride.createdAt)}</strong>
+                        </div>
+                        <span className="ride-seat-count">{ride.seats || 1} seat(s)</span>
+                      </div>
                       <p className="text-xs text-ink/60 mt-1">Passengers: {ride.passengers?.map((item) => item.name).join(', ') || '1 rider'}</p>
                       {ride.driverCancelledAt && ride.status === 'pending' && <p className="text-xs text-amber-700 mt-1">Your previous driver cancelled. CUETGo is looking for a replacement driver.</p>}
                       {['pending', 'accepted', 'arrived'].includes(ride.status) && new Date(ride.requestedTime || ride.createdAt).getTime() > Date.now() && (
