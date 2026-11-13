@@ -7,7 +7,7 @@ import { useFeedback } from '../context/FeedbackContext.jsx'
 export default function StudentLogin() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const { googleLogin, demoLogin } = useAuth()
+  const { googleLogin } = useAuth()
   const notify = useFeedback()
   const navigate = useNavigate()
   async function handleGoogle(credential) {
@@ -20,15 +20,7 @@ export default function StudentLogin() {
     notify('You are signed in.', 'success')
     navigate('/student/home', { replace: true })
   }
-  async function handleDemo() {
-    if (busy) return
-    setError(''); setBusy(true)
-    const result = await demoLogin('student')
-    setBusy(false)
-    if (!result.ok) return setError(result.message)
-    notify('Demo student session started.', 'success')
-    navigate('/student/home', { replace: true })
-  }
+
   return <div className="auth-page">
     <button onClick={() => navigate('/role')} className="auth-back">← Choose account type</button>
     <div className="auth-brand"><span className="auth-brand-mark">C</span><span>CUET<span className="auth-brand-accent">Go</span></span></div>
@@ -37,7 +29,7 @@ export default function StudentLogin() {
       <div className="auth-icon-tile">🎓</div><h2>Continue with your CUET account</h2>
       <p className="auth-panel-copy">Choose the Google account you used when creating your CUETGo account.</p>
       <div className="auth-google">{busy ? <p className="auth-progress">Verifying your Google account…</p> : <GoogleAuthButton onSuccess={handleGoogle} onError={setError} />}</div>
-      <button type="button" onClick={handleDemo} disabled={busy} className="secondary-btn w-full mt-3 py-3">Explore with demo student account</button>\n      {error && <p className="auth-error" role="alert">{error}</p>}
+      {error && <p className="auth-error" role="alert">{error}</p>}
       <p className="auth-privacy">Only verified <strong>@student.cuet.ac.bd</strong> accounts can sign in as students.</p>
     </div>
     <p className="auth-switch">New to CUETGo? <Link to="/student/signup">Create an account</Link></p>
