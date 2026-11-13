@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import { readDb, mutateDb } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
 import { findMatches, optimizeSharedRoute } from '../services/gemini.js'
+import { HALLS, LOCATIONS } from '../constants/campusLocations.js'
 
 const router = Router()
 const BOOKING_CUTOFF_MS = 2 * 60 * 1000
@@ -24,13 +25,6 @@ async function requireApprovedDriver(req, res, next) {
     next()
   } catch (error) { next(error) }
 }
-
-const HALLS = [
-  'Muktijoddha Hall', 'Shahid Mohammad Shah Hall', 'Dr. Qudrat-E-Khuda Hall',
-  'Kabi Kazi Nazrul Islam Hall', 'Shaheed Tareq Huda Hall', 'Shaheed Abu Sayed Hall',
-  'Sufia Kamal Hall', 'Begum Shamsunnahar Khan Hall', 'Tapashi Rabeya Hall',
-]
-const LOCATIONS = [...HALLS, 'CUET Main Gate', 'Academic Building', 'Central Library', 'Cafeteria']
 
 function fail(status, message) {
   const error = new Error(message)
