@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api.js'
 import { useFeedback } from '../context/FeedbackContext.jsx'
@@ -19,6 +19,31 @@ export default function DriverHome() {
   const [editingProfile, setEditingProfile] = useState(false)
   const [profileForm, setProfileForm] = useState({ name: user?.name || '', phone: user?.phone || '' })
   const [savingProfile, setSavingProfile] = useState(false)
+
+  // A driver accepts a compatible pair as one shared trip. Present it as one
+  // card and combine passenger/seat totals rather than duplicating the trip.
+  const displayRides = useMemo(() => {
+    const grouped = new Map()
+    for (const ride of rides) {
+      const key = ride.sharedGroupId || ride.id
+      const existing = grouped.get(key)
+      if (!existing) {
+        grouped.set(key, {
+          ...ride,
+          groupRideIds: [ride.id],
+          passengers: [...(ride.passengers || [])],
+          seats: Number(ride.seats || 1),
+          fare: Number(ride.fare || 0),
+        })
+      } else {
+        existing.groupRideIds.push(ride.id)
+        existing.passengers.push(...(ride.passengers || []))
+        existing.seats += Number(ride.seats || 1)
+        existing.fare += Number(ride.fare || 0)
+      }
+    }
+    return Array.from(grouped.values())
+  }, [rides])
 
   const refresh = async () => {
     try {
@@ -152,7 +177,7 @@ export default function DriverHome() {
         <div className="mt-5 flex items-center justify-between rounded-2xl bg-white/30 backdrop-blur-sm border border-white/40 px-3 py-2 shadow-soft">
           <div>
             <p className="text-[10px] uppercase tracking-[0.18em] text-ink/70">সময়সূচি</p>
-            <p className="text-xl font-bold">{user?.verificationStatus === 'approved' ? `${rides.filter((ride) => ['accepted', 'arrived', 'in_progress'].includes(ride.status)).length} সক্রিয় যাত্রা` : 'যাচাই অপেক্ষমাণ'}</p>
+            <p className="text-xl font-bold">{user?.verificationStatus === 'approved' ? `${displayRides.filter((ride) => ['accepted', 'arrived', 'in_progress'].includes(ride.status)).length} সক্রিয় যাত্রা` : 'যাচাই অপেক্ষমাণ'}</p>
           </div>
           <span className="metric-pill">🚕 সক্রিয়</span>
         </div>
@@ -217,11 +242,11 @@ export default function DriverHome() {
           <section className="space-y-4">
             <div className="app-card p-4">
               <h2 className="text-lg font-bold mb-3">আমার সময়সূচি</h2>
-              {rides.length === 0 ? (
+              {displayRides.length === 0 ? (
                 <p className="text-sm text-ink/60">গৃহীত যাত্রাগুলো আপনার সংগঠিত ভ্রমণ সময়সূচিতে দেখানো হবে।</p>
               ) : (
                 <div className="space-y-3">
-                  {rides
+                  {displayRides
                     .slice()
                     .sort((a, b) => new Date(a.requestedTime || a.createdAt) - new Date(b.requestedTime || b.createdAt))
                     .map((ride) => (
