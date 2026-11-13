@@ -109,6 +109,23 @@ function studentName(db, studentId) {
   return student ? (student.username || student.name) : 'Student'
 }
 
+// Student-facing ride payloads deliberately omit passenger phone numbers.
+function studentRideView(ride) {
+  const { passengers = [], ...safeRide } = ride
+  return {
+    ...safeRide,
+    passengers: passengers.map(({ phone, nid, nidHash, ...passenger }) => passenger),
+  }
+}
+
+function assertApprovedDriver(db, driverId) {
+  const driver = db.drivers.find((item) => item.id === driverId)
+  if (!driver) throw fail(404, 'Driver account not found.')
+  if (driver.verificationStatus !== 'approved') {
+    throw fail(403, 'Your driver account is not approved to manage rides.')
+  }
+}
+
 async function readDbAndExpirePending() {
   const snapshot = await readDb()
   const now = Date.now()
@@ -148,12 +165,17 @@ router.get('/open', requireAuth('student'), async (req, res) => {
       const passengers = normalizePassengers(ride, host)
       const seatsUsed = occupiedSeats({ ...ride, passengers })
       return {
-        ...ride,
+        id: ride.id,
+        from: ride.from,
+        to: ride.to,
+        requestedTime: ride.requestedTime || ride.createdAt,
+        createdAt: ride.createdAt,
+        status: ride.status,
+        driverCancelledAt: ride.driverCancelledAt || null,
         hostName: host?.username || host?.name || 'Campus rider',
-        hostGender: host?.gender || 'unknown',
         seats: seatsUsed,
         seatsLeft: Math.max(0, 2 - seatsUsed),
-        passengers,
+        riderCount: passengers.length,
         bookingClosesAt: new Date(pickupTime(ride) - BOOKING_CUTOFF_MS).toISOString(),
       }
     })
@@ -250,7 +272,7 @@ router.post('/request', requireAuth('student'), async (req, res) => {
     } : null
   }).filter(Boolean)
 
-  res.status(201).json({ ride, matches: matchDetails })
+  res.status(201).json({ ride: studentRideView(ride), matches: matchDetails })
 })
 
 router.post('/:id/join', requireAuth('student'), async (req, res) => {
@@ -324,7 +346,7 @@ router.post('/:id/join', requireAuth('student'), async (req, res) => {
     return target
   })
 
-  res.json({ ride, joined: true, seatsLeft: Math.max(0, 2 - occupiedSeats(ride)) })
+  res.json({ ride: studentRideView(ride), joined: true, seatsLeft: Math.max(0, 2 - occupiedSeats(ride)) })
 })
 
 // A passenger can cancel only before the two-minute lock. If the ride owner
@@ -362,7 +384,7 @@ router.post('/:id/cancel', requireAuth('student'), async (req, res) => {
     ride.updatedAt = new Date().toISOString()
     return { ride, cancelled: true, seatReopened }
   })
-  res.json({ ride: result.ride, cancelled: true, seatReopened: result.seatReopened })
+  res.json({ ride: studentRideView(result.ride), cancelled: true, seatReopened: result.seatReopened })
 })
 
 router.get('/mine', requireAuth('student'), async (req, res) => {
@@ -382,7 +404,7 @@ router.get('/mine', requireAuth('student'), async (req, res) => {
     const matches = await findMatches(ride, candidates, { useAI: false })
     return { ...ride, matchDetails: matches }
   }))
-  res.json({ rides: withMatches })
+  res.json({ rides: withMatches.map(studentRideView) })
 })
 
 router.get('/pending', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
@@ -442,6 +464,7 @@ router.post('/accept', requireAuth('driver'), requireApprovedDriver, async (req,
   }
 
   const accepted = await mutateDb((db) => {
+    assertApprovedDriver(db, req.user.id)
     const selected = selectedRideIds.map((id) => db.rides.find((ride) => ride.id === id))
     if (selected.some((ride) => !ride || ride.status !== 'pending')) {
       throw fail(409, 'One or more rides are no longer available.')
@@ -477,6 +500,7 @@ router.post('/accept', requireAuth('driver'), requireApprovedDriver, async (req,
 
 router.post('/:id/driver-cancel', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
   const ride = await mutateDb((db) => {
+    assertApprovedDriver(db, req.user.id)
     const target = db.rides.find((item) =>
       item.id === req.params.id && item.driverId === req.user.id && ['accepted', 'arrived'].includes(item.status)
     )
@@ -516,6 +540,7 @@ router.post('/:id/status', requireAuth('driver'), requireApprovedDriver, async (
     throw fail(400, 'Choose arrived or in_progress.')
   }
   const ride = await mutateDb((db) => {
+    assertApprovedDriver(db, req.user.id)
     const target = db.rides.find((item) =>
       item.id === req.params.id && item.driverId === req.user.id
     )
@@ -542,6 +567,7 @@ router.post('/:id/status', requireAuth('driver'), requireApprovedDriver, async (
 
 router.post('/:id/complete', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
   const ride = await mutateDb((db) => {
+    assertApprovedDriver(db, req.user.id)
     const target = db.rides.find((item) =>
       item.id === req.params.id && item.driverId === req.user.id && item.status === 'in_progress'
     )
