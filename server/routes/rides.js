@@ -114,6 +114,7 @@ function hasStudentTimeConflict(db, studentId, requestedAt, exceptRideId = null)
   return db.rides.some((ride) => {
     if (ride.id === exceptRideId || !['pending', 'accepted', 'arrived', 'in_progress'].includes(ride.status)) return false
     if (!studentIsOnRide(ride, studentId)) return false
+    if (ride.status === 'in_progress') return true
     return Math.abs(pickupTime(ride) - requestedAt) < STUDENT_CONFLICT_WINDOW_MS
   })
 }
@@ -299,7 +300,7 @@ router.post('/request', requireAuth('student'), async (req, res) => {
   const candidates = db.rides.filter((candidate) =>
     candidate.id !== ride.id &&
     ['pending', 'accepted', 'arrived'].includes(candidate.status) &&
-    occupiedSeats(candidate) < 2 &&
+    totalGroupSeats(db, candidate) < 2 &&
     pickupTime(candidate) > Date.now() + BOOKING_CUTOFF_MS
   )
   const matches = await findMatches(ride, candidates)
@@ -310,7 +311,7 @@ router.post('/request', requireAuth('student'), async (req, res) => {
       reason: match.reason,
       route: candidate.from + ' → ' + candidate.to,
       time: candidate.requestedTime,
-      seatsLeft: 2 - occupiedSeats(candidate),
+      seatsLeft: 2 - totalGroupSeats(db, candidate),
     } : null
   }).filter(Boolean)
 
@@ -526,7 +527,7 @@ router.post('/accept', requireAuth('driver'), requireApprovedDriver, async (req,
       !selectedRideIds.includes(ride.id)
     )
     const conflict = selected.some((ride) => existing.some((current) =>
-      Math.abs(pickupTime(current) - pickupTime(ride)) < DRIVER_BUFFER_MS
+      current.status === 'in_progress' || Math.abs(pickupTime(current) - pickupTime(ride)) < DRIVER_BUFFER_MS
     ))
     if (conflict) throw fail(409, 'This request overlaps with another accepted trip in your schedule.')
 
