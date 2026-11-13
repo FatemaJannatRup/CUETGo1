@@ -173,12 +173,12 @@ export default function StudentHome() {
     setSuccess('')
     try {
       const payload = {
-        seats: Math.max(1, Math.min(2, Number(form.seats) || 1)),
+        seats: 1,
         phone: user?.phone || '',
         info: 'Joining this ride',
-        coPassengerName: form.coPassengerName,
-        coPassengerPhone: form.coPassengerPhone,
-        coPassengerInfo: form.coPassengerInfo,
+        coPassengerName: '',
+        coPassengerPhone: '',
+        coPassengerInfo: '',
       }
       await api.joinRide(ride.id, payload)
       notify('You joined the ride successfully.', 'success')
@@ -403,8 +403,8 @@ export default function StudentHome() {
                         <p className="ride-host-name">{ride.hostName}</p>
                         <p className="text-[11px] text-ink/50 mt-1">{ride.status === 'arrived' ? 'Driver at pickup' : ride.status === 'accepted' ? 'Driver assigned' : ride.driverCancelledAt ? 'Finding a replacement driver' : 'Waiting for a driver'} • Booking closes 2 minutes before pickup</p>
                         <div className="mt-3 flex justify-between items-center">
-                          <span className="text-xs text-ink/60">{ride.passengers?.length || 1} rider(s)</span>
-                          <button onClick={() => handleJoinRide(ride)} disabled={joiningId === ride.id || seatsLeft === 0} className="primary-btn px-4 py-2 text-xs uppercase tracking-[0.12em] disabled:opacity-50">
+                          <span className="text-xs text-ink/60">{ride.riderCount ?? 1} rider(s)</span>
+                          <button onClick={() => handleJoinRide(ride)} disabled={joiningId === ride.id || seatsLeft < 1} className="primary-btn px-4 py-2 text-xs uppercase tracking-[0.12em] disabled:opacity-50">
                             {joiningId === ride.id ? 'Joining...' : 'Join ride'}
                           </button>
                         </div>

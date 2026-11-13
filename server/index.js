@@ -9,6 +9,14 @@ import { initializeDatabase, closeDatabase, checkDatabase } from './db.js'
 
 const app = express()
 app.set('trust proxy', 1)
+app.disable('x-powered-by')
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('X-Frame-Options', 'DENY')
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+  next()
+})
 const allowedOrigins = [
   'https://cuetgo-frontend-87ru.onrender.com',
   'http://localhost:5173',
@@ -21,7 +29,7 @@ const corsOptions = {
 }
 app.use(cors(corsOptions))
 app.options('*', cors(corsOptions))
-app.use(express.json())
+app.use(express.json({ limit: '32kb' }))
 
 app.use('/api/auth', authRoutes)
 app.use('/api/rides', rideRoutes)
@@ -29,8 +37,8 @@ app.use('/api/admin', adminRoutes)
 
 app.get('/api/health', async (req, res) => {
   try {
-    const counts = await checkDatabase()
-    res.json({ ok: true, database: 'connected', counts })
+    await checkDatabase()
+    res.json({ ok: true, database: 'connected' })
   } catch (error) {
     console.error('Health check failed:', error.message)
     res.status(503).json({ ok: false, database: 'unavailable' })

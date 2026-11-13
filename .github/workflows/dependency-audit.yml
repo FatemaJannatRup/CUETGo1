@@ -41,6 +41,10 @@ jobs:
           npm ci --ignore-scripts
           node --check index.js
           node --check routes/rides.js
+          node --check routes/auth.js
+          node --check routes/admin.js
+          node --check db.js
+          node --check middleware/auth.js
           node --check services/gemini.js
           node --check constants/campusLocations.js
           npm audit --json > ../backend-audit.json || true

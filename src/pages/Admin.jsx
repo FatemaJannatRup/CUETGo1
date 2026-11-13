@@ -44,8 +44,8 @@ export default function Admin() {
       return true
     } catch (e) {
       setError(e.message)
-      return false
       if (/session|logged|token|unauthorized/i.test(e.message)) logout()
+      return false
     } finally {
       setLoading(false)
     }
@@ -175,9 +175,9 @@ export default function Admin() {
             <Stat label="Pending approvals" value={overview?.pendingDrivers} hint="Require review" />
             <Stat label="Approved drivers" value={overview?.approvedDrivers} hint="Can accept rides" />
             <Stat label="Total rides" value={overview?.rides} hint="All ride records" />
-            <Stat label="Active rides" value={overview?.activeRides} hint="Currently accepted" />
+            <Stat label="Active rides" value={overview?.activeRides} hint="Accepted, arrived or in progress" />
           </div>
-          <div className="admin-panel"><h2>Quick actions</h2><div className="admin-quick-actions"><button onClick={() => {setActiveTab('Drivers');setDriverFilter('pending')}}>Review pending drivers <b>{overview?.pendingDrivers || 0}</b></button><button onClick={() => setActiveTab('Rides')}>Monitor rides <b>{overview?.pendingRides || 0} pending</b></button><button onClick={() => setActiveTab('Students')}>View student accounts</button></div></div>
+          <div className="admin-panel"><h2>Quick actions</h2><div className="admin-quick-actions"><button onClick={() => {setActiveTab('Drivers');setDriverFilter('pending')}}>Review pending drivers <b>{overview?.pendingDrivers || 0}</b></button><button onClick={() => setActiveTab('Rides')}>Monitor rides <b>{overview?.activeRides || 0} active</b></button><button onClick={() => setActiveTab('Students')}>View student accounts</button></div></div>
         </section>}
 
         {activeTab === 'Drivers' && <section className="admin-panel">
@@ -187,7 +187,7 @@ export default function Admin() {
 
         {activeTab === 'Students' && <section className="admin-panel"><div className="admin-section-heading"><div><h2>Student accounts</h2><p>Registered CUET student accounts. Sensitive credentials are not displayed.</p></div><span className="admin-count">{students.length} students</span></div>{students.length === 0 ? <div className="admin-empty">No student accounts found.</div> : <div className="admin-table-wrap"><table><thead><tr><th>Student</th><th>CUET ID</th><th>Hall</th><th>Gender</th><th>Joined</th></tr></thead><tbody>{students.map((student) => <tr key={student.id}><td><strong>{student.username || '—'}</strong><small>{student.email}</small></td><td>{student.studentId || '—'}</td><td>{student.hall || '—'}</td><td>{student.gender || '—'}</td><td>{dateLabel(student.createdAt)}</td></tr>)}</tbody></table></div>}</section>}
 
-        {activeTab === 'Rides' && <section className="admin-panel"><div className="admin-section-heading"><div><h2>Ride management</h2><p>Monitor ride requests and cancel pending or active rides when necessary.</p></div><span className="admin-count">{rides.length} rides</span></div>{rides.length === 0 ? <div className="admin-empty">No ride records found.</div> : <div className="admin-table-wrap"><table><thead><tr><th>Route</th><th>Student</th><th>Driver</th><th>Fare</th><th>Requested</th><th>Status</th><th>Action</th></tr></thead><tbody>{rides.map((ride) => <tr key={ride.id}><td><strong>{ride.from}</strong><small>to {ride.to}</small></td><td>{ride.studentName}<small>{ride.studentEmail}</small></td><td>{ride.driverName || '—'}<small>{ride.driverPhone}</small></td><td>৳{ride.fare ?? '—'}</td><td>{dateLabel(ride.requestedTime)}</td><td><span className={`admin-status status-${ride.status}`}>{ride.status}</span></td><td>{['pending','accepted'].includes(ride.status) ? <button className="admin-cancel" disabled={busyId === ride.id} onClick={() => cancelRide(ride.id)}>Cancel ride</button> : '—'}</td></tr>)}</tbody></table></div>}</section>}
+        {activeTab === 'Rides' && <section className="admin-panel"><div className="admin-section-heading"><div><h2>Ride management</h2><p>Monitor ride requests and cancel pending or active rides when necessary.</p></div><span className="admin-count">{rides.length} rides</span></div>{rides.length === 0 ? <div className="admin-empty">No ride records found.</div> : <div className="admin-table-wrap"><table><thead><tr><th>Route</th><th>Student</th><th>Driver</th><th>Fare</th><th>Requested</th><th>Status</th><th>Action</th></tr></thead><tbody>{rides.map((ride) => <tr key={ride.id}><td><strong>{ride.from}</strong><small>to {ride.to}</small></td><td>{ride.studentName}<small>{ride.studentEmail}</small></td><td>{ride.driverName || '—'}<small>{ride.driverPhone}</small></td><td>৳{ride.fare ?? '—'}</td><td>{dateLabel(ride.requestedTime)}</td><td><span className={`admin-status status-${ride.status}`}>{ride.status}</span></td><td>{['pending','accepted','arrived'].includes(ride.status) ? <button className="admin-cancel" disabled={busyId === ride.id} onClick={() => cancelRide(ride.id)}>Cancel ride</button> : '—'}</td></tr>)}</tbody></table></div>}</section>}
       </>}
       <footer className="admin-footer">CUETGo Administration · Keep account information confidential.</footer>
     </main>

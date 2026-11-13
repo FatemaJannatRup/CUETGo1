@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
-import { readDb, writeDb } from '../db.js'
+import { readDb, mutateDb } from '../db.js'
 import { signToken, requireAuth } from '../middleware/auth.js'
 
 const router = Router()
@@ -11,6 +11,13 @@ const MAX_ATTEMPTS = 5
 function rateLimitLogin(req, res, next) {
   const key = req.ip || req.socket.remoteAddress || 'unknown'
   const now = Date.now()
+  for (const [ip, attempt] of loginAttempts) {
+    if (now - attempt.startedAt >= WINDOW_MS) loginAttempts.delete(ip)
+  }
+  if (loginAttempts.size > 5000) {
+    const oldestKey = loginAttempts.keys().next().value
+    if (oldestKey) loginAttempts.delete(oldestKey)
+  }
   const record = loginAttempts.get(key)
   if (record && now - record.startedAt < WINDOW_MS && record.count >= MAX_ATTEMPTS) {
     return res.status(429).json({ message: 'Too many login attempts. Try again in 15 minutes.' })
@@ -93,7 +100,7 @@ router.get('/overview', requireAuth('admin'), async (req, res) => {
       rejectedDrivers: drivers.filter((d) => d.verificationStatus === 'rejected').length,
       rides: rides.length,
       pendingRides: rides.filter((r) => r.status === 'pending').length,
-      activeRides: rides.filter((r) => r.status === 'accepted').length,
+      activeRides: rides.filter((r) => ['accepted', 'arrived', 'in_progress'].includes(r.status)).length,
       completedRides: rides.filter((r) => r.status === 'completed').length,
     },
   })
@@ -114,17 +121,32 @@ router.patch('/drivers/:id/status', requireAuth('admin'), async (req, res) => {
   if (!['approved', 'rejected', 'pending'].includes(status)) {
     return res.status(400).json({ message: 'Choose approved, rejected, or pending.' })
   }
-  const db = await readDb()
-  const driver = (db.drivers || []).find((item) => item.id === req.params.id)
-  if (!driver) return res.status(404).json({ message: 'Driver account not found.' })
-  driver.verificationStatus = status
-  driver.verified = status === 'approved'
-  driver.reviewedAt = new Date().toISOString()
-  if (status === 'approved') driver.approvedAt = driver.reviewedAt
-  else delete driver.approvedAt
-  driver.updatedAt = driver.reviewedAt
-  await writeDb(db)
-  res.json({ driver: safeDriver(driver) })
+
+  const result = await mutateDb((db) => {
+    const driver = (db.drivers || []).find((item) => item.id === req.params.id)
+    if (!driver) {
+      const error = new Error('Driver account not found.')
+      error.status = 404
+      throw error
+    }
+    const hasActiveRides = (db.rides || []).some((ride) =>
+      ride.driverId === driver.id && ['accepted', 'arrived', 'in_progress'].includes(ride.status)
+    )
+    if (status !== 'approved' && hasActiveRides) {
+      const error = new Error('This driver has active rides. Complete or safely cancel those rides before changing approval status.')
+      error.status = 409
+      throw error
+    }
+
+    driver.verificationStatus = status
+    driver.verified = status === 'approved'
+    driver.reviewedAt = new Date().toISOString()
+    if (status === 'approved') driver.approvedAt = driver.reviewedAt
+    else delete driver.approvedAt
+    driver.updatedAt = driver.reviewedAt
+    return driver
+  })
+  res.json({ driver: safeDriver(result) })
 })
 
 router.get('/students', requireAuth('admin'), async (req, res) => {
@@ -161,20 +183,33 @@ router.get('/rides', requireAuth('admin'), async (req, res) => {
 })
 
 router.patch('/rides/:id/cancel', requireAuth('admin'), async (req, res) => {
-  const db = await readDb()
-  const ride = (db.rides || []).find((item) => item.id === req.params.id)
-  if (!ride) return res.status(404).json({ message: 'Ride not found.' })
-  if (!['pending', 'accepted'].includes(ride.status)) {
-    return res.status(409).json({ message: 'Only pending or active rides can be cancelled.' })
-  }
-  ride.status = 'cancelled'
-  ride.cancelledAt = new Date().toISOString()
-  ride.cancelledBy = 'admin'
-  ride.driverId = null
-  delete ride.sharedGroupId
-  ride.updatedAt = ride.cancelledAt
-  await writeDb(db)
-  res.json({ ride: { id: ride.id, status: ride.status } })
+  const result = await mutateDb((db) => {
+    const target = (db.rides || []).find((item) => item.id === req.params.id)
+    if (!target) {
+      const error = new Error('Ride not found.')
+      error.status = 404
+      throw error
+    }
+    const group = target.sharedGroupId
+      ? db.rides.filter((ride) => ride.sharedGroupId === target.sharedGroupId && ride.driverId === target.driverId)
+      : [target]
+    if (!group.every((ride) => ['pending', 'accepted', 'arrived'].includes(ride.status))) {
+      const error = new Error('This trip has started or already changed status. Contact the parties directly; it cannot be cancelled from the dashboard.')
+      error.status = 409
+      throw error
+    }
+    const cancelledAt = new Date().toISOString()
+    for (const ride of group) {
+      ride.status = 'cancelled'
+      ride.cancelledAt = cancelledAt
+      ride.cancelledBy = 'admin'
+      ride.driverId = null
+      delete ride.sharedGroupId
+      ride.updatedAt = cancelledAt
+    }
+    return group.map((ride) => ({ id: ride.id, status: ride.status }))
+  })
+  res.json({ rides: result, ride: result[0] })
 })
 
 export default router

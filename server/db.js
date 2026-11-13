@@ -86,7 +86,18 @@ async function persistDb(queryable, data) {
 }
 
 export async function readDb() {
-  return loadDb(pool)
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY')
+    const data = await loadDb(client)
+    await client.query('COMMIT')
+    return data
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
 }
 
 // All application writes use the same transaction-scoped advisory lock. This
@@ -101,21 +112,6 @@ export async function mutateDb(mutator) {
     await persistDb(client, data)
     await client.query('COMMIT')
     return result
-  } catch (error) {
-    await client.query('ROLLBACK')
-    throw error
-  } finally {
-    client.release()
-  }
-}
-
-export async function writeDb(data) {
-  const client = await pool.connect()
-  try {
-    await client.query('BEGIN')
-    await client.query('SELECT pg_advisory_xact_lock($1)', [72419031])
-    await persistDb(client, data)
-    await client.query('COMMIT')
   } catch (error) {
     await client.query('ROLLBACK')
     throw error
