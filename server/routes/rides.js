@@ -247,6 +247,24 @@ router.post('/:id/join', requireAuth('student'), async (req, res) => {
 
     const student = db.students.find((item) => item.id === req.user.id)
     if (!student) throw fail(404, 'Student account not found.')
+
+    // If this student already created a matching one-seat request, pool it into
+    // this ride atomically instead of making them cancel manually.
+    const ownRequest = db.rides.find((item) =>
+      item.id !== target.id &&
+      item.studentId === student.id &&
+      item.status === 'pending' &&
+      sameRoute(item, target) &&
+      Math.abs(pickupTime(item) - pickupTime(target)) <= MATCH_WINDOW_MS &&
+      occupiedSeats(item) === 1
+    )
+    if (ownRequest) {
+      ownRequest.status = 'cancelled'
+      ownRequest.cancelledAt = new Date().toISOString()
+      ownRequest.cancelledBy = 'student-pooled'
+      ownRequest.updatedAt = ownRequest.cancelledAt
+    }
+
     if (hasStudentTimeConflict(db, req.user.id, pickupTime(target))) {
       throw fail(409, 'You already have another ride close to this pickup time.')
     }
