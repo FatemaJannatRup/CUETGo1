@@ -1,8 +1,6 @@
 name: Dependency security audit
 
 on:
-  push:
-    branches: [fix/security-and-experience]
   pull_request:
     branches: [main]
   workflow_dispatch:
