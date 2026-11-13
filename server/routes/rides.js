@@ -498,7 +498,7 @@ router.post('/:id/status', requireAuth('driver'), requireApprovedDriver, async (
 router.post('/:id/complete', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
   const ride = await mutateDb((db) => {
     const target = db.rides.find((item) =>
-      item.id === req.params.id && item.driverId === req.user.id && ['accepted', 'arrived', 'in_progress'].includes(item.status)
+      item.id === req.params.id && item.driverId === req.user.id && item.status === 'in_progress'
     )
     if (!target) throw fail(404, 'Accepted ride not found.')
     target.status = 'completed'
