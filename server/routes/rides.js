@@ -460,19 +460,25 @@ router.post('/:id/driver-cancel', requireAuth('driver'), requireApprovedDriver, 
     )
     if (!target) throw fail(404, 'Accepted ride not found.')
     const now = Date.now()
-    if (pickupTime(target) - now > BOOKING_CUTOFF_MS) {
-      target.status = 'pending'
-      target.driverId = null
-      target.driverCancelledAt = new Date().toISOString()
-      target.driverCancelReason = String(req.body?.reason || '').slice(0, 240)
-      target.updatedAt = target.driverCancelledAt
-      return { ride: target, reopened: true }
-    }
-    target.status = 'cancelled'
     target.driverCancelledAt = new Date().toISOString()
     target.driverCancelReason = String(req.body?.reason || '').slice(0, 240)
     target.updatedAt = target.driverCancelledAt
-    return { ride: target, reopened: false }
+
+    if (pickupTime(target) <= now) {
+      target.status = 'cancelled'
+      return { ride: target, reopened: false, replacementNeeded: false }
+    }
+
+    // Keep the passenger group intact after cutoff, but return the trip to the
+    // driver queue so another approved driver can take it before pickup.
+    target.status = 'pending'
+    target.driverId = null
+    target.bookingLocked = pickupTime(target) - now <= BOOKING_CUTOFF_MS
+    return {
+      ride: target,
+      reopened: !target.bookingLocked,
+      replacementNeeded: true,
+    }
   })
   res.json(ride)
 })
