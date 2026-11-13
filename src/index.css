@@ -480,3 +480,18 @@ button:active { transform: scale(.985); }
 .cuetgo-feedback-loading{border-color:#cfe6f2}.cuetgo-feedback-success{border-color:#c8eadb}.cuetgo-feedback-error{border-color:#f2d1d5;color:#9f3345}.cuetgo-feedback-icon{width:23px;height:23px;flex:0 0 23px;display:grid;place-items:center;border-radius:50%;background:#eaf4f8;color:#26769d;font-weight:900}.cuetgo-feedback-success .cuetgo-feedback-icon{background:#e6f6ed;color:#188454}.cuetgo-feedback-error .cuetgo-feedback-icon{background:#fff0f1;color:#c33f53}.cuetgo-feedback-spinner{width:19px;height:19px;flex:0 0 19px;border:2px solid #d8eaf2;border-top-color:#2d83ad;border-radius:50%;animation:cuetgo-spin .7s linear infinite}
 @keyframes cuetgo-toast-in{from{opacity:0;transform:translate(-50%,-9px) scale(.98)}to{opacity:1;transform:translate(-50%,0) scale(1)}}@keyframes cuetgo-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.cuetgo-feedback,.cuetgo-feedback-spinner{animation:none}}
+
+
+/* Full-height route backgrounds: prevent the screen's unused lower area
+   from exposing the white phone-screen background on tall displays. */
+.phone-screen { background: #f4f8fa; }
+.screen-scroll { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.screen-scroll > .route-transition {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  min-height: 100%;
+  width: 100%;
+}
+.route-transition > * { flex: 1 0 auto; }
+.auth-page, .welcome-page, .role-page { min-height: 100%; flex: 1 0 auto; }
