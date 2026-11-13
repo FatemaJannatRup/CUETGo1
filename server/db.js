@@ -11,7 +11,7 @@ const pool = new Pool({
   connectionTimeoutMillis: 10000,
 })
 
-const DEMO_STUDENTS = [
+const TABLES = {
   { id:'demo-student-1', username:'rup_demo', name:'Rup Demo', email:'u2204001@student.cuet.ac.bd', studentId:'2204001', hall:'Muktijoddha Hall', gender:'female', googleId:'demo-google-student-1', authProvider:'demo', demo:true, createdAt:new Date().toISOString() },
   { id:'demo-student-2', username:'sami_demo', name:'Sami Demo', email:'u2204002@student.cuet.ac.bd', studentId:'2204002', hall:'Shaheed Tareq Huda Hall', gender:'male', googleId:'demo-google-student-2', authProvider:'demo', demo:true, createdAt:new Date().toISOString() },
   { id:'demo-student-3', username:'nabila_demo', name:'Nabila Demo', email:'u2204003@student.cuet.ac.bd', studentId:'2204003', hall:'Sufia Kamal Hall', gender:'female', googleId:'demo-google-student-3', authProvider:'demo', demo:true, createdAt:new Date().toISOString() },
@@ -68,22 +68,14 @@ export async function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS cuetgo_rides_driver_column_idx ON cuetgo_rides (driver_id);
   `)
 
-  if (String(process.env.SEED_DEMO_DATA || 'true').toLowerCase() === 'true') {
-    const client = await pool.connect()
-    try {
-      await client.query('BEGIN')
-      for (const [kind, records] of [['students',DEMO_STUDENTS],['drivers',DEMO_DRIVERS],['rides',DEMO_RIDES]]) {
-        for (const record of records) await saveRecord(client,kind,record,true)
-      }
-      await client.query('COMMIT')
-      console.log('Demo records ensured in PostgreSQL.')
-    } catch (error) {
-      await client.query('ROLLBACK')
-      throw error
-    } finally {
-      client.release()
-    }
-  }
+  // Remove only records created by the temporary demo seed. Real user data is preserved.
+  const removed = await pool.query(`
+    DELETE FROM cuetgo_rides WHERE id LIKE 'demo-%' OR data->>'demo' = 'true';
+    DELETE FROM cuetgo_drivers WHERE id LIKE 'demo-%' OR data->>'demo' = 'true';
+    DELETE FROM cuetgo_students WHERE id LIKE 'demo-%' OR data->>'demo' = 'true';
+  `)
+  console.log('Temporary demo records removed from PostgreSQL.')
+
 
   console.log('PostgreSQL ready. Record counts:', await checkDatabase())
 }
