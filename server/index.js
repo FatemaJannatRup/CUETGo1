@@ -5,7 +5,7 @@ import cors from 'cors'
 import authRoutes from './routes/auth.js'
 import rideRoutes from './routes/rides.js'
 import adminRoutes from './routes/admin.js'
-import { initializeDatabase, closeDatabase } from './db.js'
+import { initializeDatabase, closeDatabase, checkDatabase } from './db.js'
 
 const app = express()
 app.set('trust proxy', 1)
@@ -27,7 +27,21 @@ app.use('/api/auth', authRoutes)
 app.use('/api/rides', rideRoutes)
 app.use('/api/admin', adminRoutes)
 
-app.get('/api/health', (req, res) => res.json({ ok: true }))
+app.get('/api/health', async (req, res) => {
+  try {
+    const counts = await checkDatabase()
+    res.json({ ok: true, database: 'connected', counts })
+  } catch (error) {
+    console.error('Health check failed:', error.message)
+    res.status(503).json({ ok: false, database: 'unavailable' })
+  }
+})
+
+app.use((error, req, res, next) => {
+  console.error('Unhandled API error:', error)
+  if (res.headersSent) return next(error)
+  res.status(error.status || 500).json({ message: error.status ? error.message : 'An unexpected server error occurred.' })
+})
 
 const PORT = Number(process.env.PORT || 5000)
 
