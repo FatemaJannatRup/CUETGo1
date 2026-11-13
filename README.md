@@ -63,7 +63,7 @@ CUETGo1/
 │   ├── middleware/         # Authentication middleware
 │   ├── routes/             # Authentication, rides and admin APIs
 │   ├── services/           # Ride matching service
-│   ├── data/               # Local JSON data store (created at runtime)
+│   ├── db.js               # PostgreSQL schema, queries and demo seeding
 │   └── index.js            # Express server entry point
 ├── render.yaml             # Render deployment configuration
 ├── package.json
@@ -98,7 +98,10 @@ Create `server/.env` (you can start from `server/.env.example`) and configure:
 ```env
 PORT=5000
 NODE_ENV=development
-JWT_SECRET=replace_with_a_long_random_secret
+DATABASE_URL=your_supabase_session_pooler_uri
+JWT_SECRET=replace_with_a_long_random_secret_at_least_32_characters
+DEMO_MODE=true
+SEED_DEMO_DATA=true
 GOOGLE_CLIENT_ID=your_google_oauth_web_client_id
 ADMIN_EMAIL=your_admin_email
 ADMIN_PASSWORD_HASH=your_bcrypt_password_hash
