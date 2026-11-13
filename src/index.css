@@ -828,3 +828,53 @@ body {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+
+/* Carry the same visual language through onboarding and account screens. */
+.auth-page,.welcome-page,.role-page {
+  background:
+    radial-gradient(ellipse at 92% 0%, rgba(8,127,120,.08), transparent 42%),
+    linear-gradient(180deg, #fbfcfb 0%, #f2f5f3 100%) !important;
+  color: var(--cuet-ink);
+}
+.auth-brand,.welcome-topline { color: var(--cuet-navy) !important; }
+.auth-brand-mark,.admin-mark,.admin-mark-small {
+  background: var(--cuet-teal) !important;
+  box-shadow: 0 7px 16px rgba(8,127,120,.18) !important;
+}
+.auth-brand-accent,.welcome-hero h1 span,.role-arrow { color: var(--cuet-teal) !important; }
+.auth-eyebrow,.admin-eyebrow { color: var(--cuet-teal) !important; }
+.auth-heading h1,.welcome-hero h1,.role-heading h1 { color: var(--cuet-navy) !important; }
+.auth-heading p,.welcome-hero p,.role-heading p { color: #718087 !important; }
+.auth-panel,.role-card,.admin-login-card {
+  border-color: var(--cuet-line) !important;
+  border-radius: 20px !important;
+  background: #fff !important;
+  box-shadow: var(--cuet-shadow) !important;
+}
+.auth-icon-tile,.role-icon,.welcome-emoji {
+  background: var(--cuet-teal-soft) !important;
+  color: var(--cuet-teal-dark);
+}
+.auth-input:focus,.admin-login-card input:focus {
+  border-color: #66aaa2 !important;
+  box-shadow: 0 0 0 3px rgba(8,127,120,.11) !important;
+}
+.auth-google-disabled { border-color: #dce6e3 !important; background: #f7faf9 !important; }
+.auth-switch a,.auth-back:hover { color: var(--cuet-teal-dark) !important; }
+.welcome-cta,.admin-primary {
+  background: var(--cuet-teal) !important;
+  box-shadow: 0 8px 18px rgba(8,127,120,.18) !important;
+}
+.welcome-cta:hover,.admin-primary:hover { background: var(--cuet-teal-dark) !important; }
+.role-card:hover { border-color: #a9d2ca !important; }
+.admin-page { background: var(--cuet-bg) !important; }
+.admin-header { border-color: var(--cuet-line) !important; }
+.admin-tabs { background: #e9eeec !important; }
+.admin-tabs button.active { color: var(--cuet-teal-dark) !important; }
+@media (max-width: 600px) {
+  .auth-page,.welcome-page,.role-page { padding-left: 20px; padding-right: 20px; }
+  .auth-panel { padding: 22px 18px 18px; }
+  .admin-login-page { padding: 22px 16px; }
+  .admin-login-card { padding: 26px 20px; }
+}
