@@ -356,7 +356,7 @@ export default function StudentHome() {
                           <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold uppercase text-emerald-700">{seatsLeft} left</span>
                         </div>
                         <p className="text-xs text-ink/60 mt-2">{ride.hostName} • {formatTime(ride.requestedTime || ride.createdAt)}</p>
-                        <p className="text-[11px] text-ink/50 mt-1">{ride.status === 'accepted' ? 'Driver accepted' : 'Waiting for a driver'} • Booking closes 2 minutes before pickup</p>
+                        <p className="text-[11px] text-ink/50 mt-1">{ride.status === 'arrived' ? 'Driver at pickup' : ride.status === 'accepted' ? 'Driver assigned' : 'Waiting for a driver'} • Booking closes 2 minutes before pickup</p>
                         <div className="mt-3 flex justify-between items-center">
                           <span className="text-xs text-ink/60">{ride.passengers?.length || 1} rider(s)</span>
                           <button onClick={() => handleJoinRide(ride)} disabled={joiningId === ride.id || seatsLeft === 0} className="primary-btn px-4 py-2 text-xs uppercase tracking-[0.12em] disabled:opacity-50">
@@ -384,7 +384,7 @@ export default function StudentHome() {
                       </div>
                       <p className="text-xs text-ink/60 mt-2">{formatTime(ride.requestedTime || ride.createdAt)} • {ride.seats || 1} seat(s)</p>
                       <p className="text-xs text-ink/60 mt-1">Passengers: {ride.passengers?.map((item) => item.name).join(', ') || '1 rider'}</p>
-                      {['pending', 'accepted'].includes(ride.status) && new Date(ride.requestedTime || ride.createdAt).getTime() - Date.now() > 2 * 60 * 1000 && (
+                      {['pending', 'accepted', 'arrived'].includes(ride.status) && new Date(ride.requestedTime || ride.createdAt).getTime() - Date.now() > 2 * 60 * 1000 && (
                         <button onClick={() => handleCancelRide(ride)} className="secondary-btn w-full mt-3 py-2 text-xs uppercase tracking-[0.12em]">Cancel my place</button>
                       )}
                     </div>
