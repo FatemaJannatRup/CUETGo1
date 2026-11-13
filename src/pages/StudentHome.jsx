@@ -26,6 +26,8 @@ export default function StudentHome() {
   useEffect(() => { sessionStorage.setItem('cuetgo_student_tab', tab) }, [tab])
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [cancelRideTarget, setCancelRideTarget] = useState(null)
+  const [canceling, setCanceling] = useState(false)
   const [joiningId, setJoiningId] = useState(null)
   const [editingProfile, setEditingProfile] = useState(false)
   const [profileForm, setProfileForm] = useState({ username: user?.username || user?.name || '', hall: user?.hall || '', gender: user?.gender || '' })
@@ -160,20 +162,27 @@ export default function StudentHome() {
     }
   }
 
-  const handleCancelRide = async (ride) => {
+  const handleCancelRide = (ride) => {
     setError('')
     setSuccess('')
-    const confirmed = window.confirm('Cancel your place in this ride? Any seat you release will become available to another student.')
-    if (!confirmed) return
+    setCancelRideTarget(ride)
+  }
+
+  const confirmCancelRide = async () => {
+    if (!cancelRideTarget) return
+    setCanceling(true)
     notify('Cancelling your ride…', 'loading', 0)
     try {
-      const result = await api.cancelRide(ride.id)
+      const result = await api.cancelRide(cancelRideTarget.id)
+      setCancelRideTarget(null)
       notify('Your ride place was cancelled.', 'success')
       setSuccess(result.seatReopened ? 'Your place was cancelled and the seat is available to another student.' : 'Your place was cancelled. The seat stays locked because the booking cutoff has passed.')
       await refreshData()
     } catch (err) {
       notify(err.message, 'error')
       setError(err.message)
+    } finally {
+      setCanceling(false)
     }
   }
 
@@ -205,7 +214,7 @@ export default function StudentHome() {
             <p className="text-ink/70 text-xs uppercase tracking-[0.2em]">Student Dashboard</p>
             <h1 className="text-2xl font-bold mt-2">{user?.name || 'Student'}</h1>
           </div>
-          <button onClick={() => { notify('Logging out…', 'loading', 0); window.setTimeout(logout, 500) }} className="text-sm font-semibold text-ink/80 underline">Log out</button>
+          <button type="button" onClick={logout} className="text-sm font-semibold text-ink/80 underline">Log out</button>
         </div>
 
         <div className="mt-5 flex items-center justify-between rounded-2xl bg-white/30 backdrop-blur-sm border border-white/40 px-3 py-2 shadow-soft">
@@ -484,6 +493,20 @@ export default function StudentHome() {
           </div>
         )}
       </main>
+      {cancelRideTarget && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-5 backdrop-blur-sm" onClick={() => !canceling && setCancelRideTarget(null)}>
+          <section role="dialog" aria-modal="true" aria-labelledby="student-cancel-title" className="w-full max-w-sm rounded-3xl border border-white/70 bg-white p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-2xl">⚠️</div>
+            <h2 id="student-cancel-title" className="text-lg font-bold text-ink">Cancel your ride place?</h2>
+            <p className="mt-2 text-sm leading-relaxed text-ink/65">Are you sure you want to cancel this ride? Any seat released will become available to another student, if the booking cutoff has not passed.</p>
+            <div className="mt-4 rounded-2xl bg-sky-50 p-3 text-sm font-semibold text-ink">{cancelRideTarget.from} → {cancelRideTarget.to}</div>
+            <div className="mt-5 flex gap-2">
+              <button type="button" disabled={canceling} onClick={() => setCancelRideTarget(null)} className="secondary-btn flex-1 rounded-xl px-3 py-3 text-sm">Keep ride</button>
+              <button type="button" disabled={canceling} onClick={confirmCancelRide} className="flex-1 rounded-xl bg-rose-600 px-3 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60">{canceling ? 'Cancelling…' : 'Yes, cancel'}</button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   )
 }
