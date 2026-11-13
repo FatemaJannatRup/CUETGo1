@@ -13,8 +13,14 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: DATABASE_URL
+        sync: false
       - key: JWT_SECRET
         generateValue: true
+      - key: DEMO_MODE
+        value: 'true'
+      - key: SEED_DEMO_DATA
+        value: 'true'
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: ADMIN_EMAIL
