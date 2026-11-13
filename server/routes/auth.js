@@ -67,7 +67,7 @@ router.post('/google/signup', async (req, res) => {
       return res.status(400).json({ message: 'Choose a valid account type.' })
     }
     const google = await verifiedGoogleUser(credential)
-    const db = readDb()
+    const db = await readDb()
 
     if (uniqueGoogleId(db, google.googleId)) {
       return res.status(409).json({ message: 'This Google account is already registered. Please log in.' })
@@ -129,7 +129,7 @@ router.post('/google/signup', async (req, res) => {
       db.drivers.push(account)
     }
 
-    writeDb(db)
+    await writeDb(db)
     return issueSession(res, account, role)
   } catch (error) {
     console.error('Google signup failed:', error.message)
@@ -171,7 +171,7 @@ router.post('/google/login', async (req, res) => {
   }
 })
 
-router.get('/me', requireAuth(), (req, res) => {
+router.get('/me', requireAuth(), async (req, res) => {
   const db = readDb()
   if (req.user.role === 'student') {
     const student = db.students.find((s) => s.id === req.user.id)
@@ -186,7 +186,7 @@ router.get('/me', requireAuth(), (req, res) => {
   return res.status(403).json({ message: 'Invalid account role.' })
 })
 
-router.put('/profile', requireAuth(), (req, res) => {
+router.put('/profile', requireAuth(), async (req, res) => {
   const db = readDb()
   if (req.user.role === 'student') {
     const student = db.students.find((s) => s.id === req.user.id)
