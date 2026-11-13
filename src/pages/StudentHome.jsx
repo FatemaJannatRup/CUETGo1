@@ -164,7 +164,14 @@ export default function StudentHome() {
     setError('')
     setSuccess('')
     try {
-      const payload = { seats: Math.max(1, Math.min(2, Number(form.seats) || 1)), phone: user?.phone || '', info: 'Joining this ride' }
+      const payload = {
+        seats: Math.max(1, Math.min(2, Number(form.seats) || 1)),
+        phone: user?.phone || '',
+        info: 'Joining this ride',
+        coPassengerName: form.coPassengerName,
+        coPassengerPhone: form.coPassengerPhone,
+        coPassengerInfo: form.coPassengerInfo,
+      }
       await api.joinRide(ride.id, payload)
       notify('You joined the ride successfully.', 'success')
       setSuccess('You joined the ride successfully.')
