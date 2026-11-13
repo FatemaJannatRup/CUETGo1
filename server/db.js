@@ -60,12 +60,12 @@ export async function initializeDatabase() {
     UPDATE cuetgo_students SET email=data->>'email', username=data->>'username', student_id=data->>'studentId', hall=data->>'hall', gender=data->>'gender', created_at=NULLIF(data->>'createdAt','')::timestamptz WHERE email IS NULL;
     UPDATE cuetgo_drivers SET email=data->>'email', name=data->>'name', phone=data->>'phone', nid_last4=data->>'nidLast4', verification_status=COALESCE(data->>'verificationStatus','pending'), created_at=NULLIF(data->>'createdAt','')::timestamptz WHERE email IS NULL;
     UPDATE cuetgo_rides SET student_id=data->>'studentId', driver_id=data->>'driverId', from_location=data->>'from', to_location=data->>'to', fare=COALESCE(NULLIF(data->>'fare','')::numeric,0), seats=COALESCE(NULLIF(data->>'seats','')::integer,1), status=COALESCE(data->>'status','pending'), requested_time=NULLIF(data->>'requestedTime','')::timestamptz, created_at=NULLIF(data->>'createdAt','')::timestamptz WHERE student_id IS NULL;
-    CREATE INDEX IF NOT EXISTS cuetgo_students_email_idx ON cuetgo_students (email);
-    CREATE INDEX IF NOT EXISTS cuetgo_drivers_email_idx ON cuetgo_drivers (email);
-    CREATE INDEX IF NOT EXISTS cuetgo_drivers_status_idx ON cuetgo_drivers (verification_status);
-    CREATE INDEX IF NOT EXISTS cuetgo_rides_status_idx ON cuetgo_rides (status);
-    CREATE INDEX IF NOT EXISTS cuetgo_rides_student_idx ON cuetgo_rides (student_id);
-    CREATE INDEX IF NOT EXISTS cuetgo_rides_driver_idx ON cuetgo_rides (driver_id);
+    CREATE INDEX IF NOT EXISTS cuetgo_students_email_column_idx ON cuetgo_students (email);
+    CREATE INDEX IF NOT EXISTS cuetgo_drivers_email_column_idx ON cuetgo_drivers (email);
+    CREATE INDEX IF NOT EXISTS cuetgo_drivers_status_column_idx ON cuetgo_drivers (verification_status);
+    CREATE INDEX IF NOT EXISTS cuetgo_rides_status_column_idx ON cuetgo_rides (status);
+    CREATE INDEX IF NOT EXISTS cuetgo_rides_student_column_idx ON cuetgo_rides (student_id);
+    CREATE INDEX IF NOT EXISTS cuetgo_rides_driver_column_idx ON cuetgo_rides (driver_id);
   `)
 
   if (String(process.env.SEED_DEMO_DATA || 'true').toLowerCase() === 'true') {
