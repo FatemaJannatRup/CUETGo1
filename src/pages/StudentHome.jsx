@@ -173,12 +173,12 @@ export default function StudentHome() {
     setSuccess('')
     try {
       const payload = {
-        seats: Math.max(1, Math.min(2, Number(form.seats) || 1)),
+        seats: 1,
         phone: user?.phone || '',
         info: 'Joining this ride',
-        coPassengerName: form.coPassengerName,
-        coPassengerPhone: form.coPassengerPhone,
-        coPassengerInfo: form.coPassengerInfo,
+        coPassengerName: '',
+        coPassengerPhone: '',
+        coPassengerInfo: '',
       }
       await api.joinRide(ride.id, payload)
       notify('You joined the ride successfully.', 'success')
@@ -369,7 +369,7 @@ export default function StudentHome() {
                         </div>
                         <div className="flex flex-col items-end gap-2">
                           <span className="ride-status-pill ride-status-open">{ride.seatsLeft ?? Math.max(0, 2 - Number(ride.seats || 1))} LEFT</span>
-                          <button onClick={() => handleJoinRide(ride)} disabled={joiningId === ride.id || (ride.seatsLeft ?? Math.max(0, 2 - Number(ride.seats || 1))) < Number(form.seats || 1)} className="primary-btn px-3 py-2 text-[10px] uppercase tracking-[0.10em] disabled:opacity-50">{joiningId === ride.id ? 'Joining…' : 'Join'}</button>
+                          <button onClick={() => handleJoinRide(ride)} disabled={joiningId === ride.id || (ride.seatsLeft ?? Math.max(0, 2 - Number(ride.seats || 1))) < 1} className="primary-btn px-3 py-2 text-[10px] uppercase tracking-[0.10em] disabled:opacity-50">{joiningId === ride.id ? 'Joining…' : 'Join'}</button>
                         </div>
                       </div>
                     </div>
@@ -404,7 +404,7 @@ export default function StudentHome() {
                         <p className="text-[11px] text-ink/50 mt-1">{ride.status === 'arrived' ? 'Driver at pickup' : ride.status === 'accepted' ? 'Driver assigned' : ride.driverCancelledAt ? 'Finding a replacement driver' : 'Waiting for a driver'} • Booking closes 2 minutes before pickup</p>
                         <div className="mt-3 flex justify-between items-center">
                           <span className="text-xs text-ink/60">{ride.passengers?.length || 1} rider(s)</span>
-                          <button onClick={() => handleJoinRide(ride)} disabled={joiningId === ride.id || seatsLeft < Number(form.seats || 1)} className="primary-btn px-4 py-2 text-xs uppercase tracking-[0.12em] disabled:opacity-50">
+                          <button onClick={() => handleJoinRide(ride)} disabled={joiningId === ride.id || seatsLeft < 1} className="primary-btn px-4 py-2 text-xs uppercase tracking-[0.12em] disabled:opacity-50">
                             {joiningId === ride.id ? 'Joining...' : 'Join ride'}
                           </button>
                         </div>
