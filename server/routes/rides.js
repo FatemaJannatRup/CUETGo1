@@ -87,7 +87,7 @@ function studentIsOnRide(ride, studentId) {
 
 function hasStudentTimeConflict(db, studentId, requestedAt, exceptRideId = null) {
   return db.rides.some((ride) => {
-    if (ride.id === exceptRideId || !['pending', 'accepted'].includes(ride.status)) return false
+    if (ride.id === exceptRideId || !['pending', 'accepted', 'arrived', 'in_progress'].includes(ride.status)) return false
     if (!studentIsOnRide(ride, studentId)) return false
     return Math.abs(pickupTime(ride) - requestedAt) < STUDENT_CONFLICT_WINDOW_MS
   })
