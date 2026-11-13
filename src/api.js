@@ -64,6 +64,7 @@ export const api = {
   acceptRide: (rideIds) => request('/rides/accept', { method: 'POST', body: { rideIds }, auth: true }),
   completeRide: (id) => request(`/rides/${id}/complete`, { method: 'POST', auth: true }),
   driverCancelRide: (id, reason = '') => request(`/rides/${id}/driver-cancel`, { method: 'POST', body: { reason }, auth: true }),
+  updateRideStatus: (id, status) => request(`/rides/${id}/status`, { method: 'POST', body: { status }, auth: true }),
   myDriverRides: () => request('/rides/mine-driver', { auth: true }),
 }
 export { getToken }
