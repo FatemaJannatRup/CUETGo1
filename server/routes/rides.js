@@ -53,7 +53,8 @@ function passengerSeats(passenger) {
 }
 
 function occupiedSeats(ride) {
-  if (Array.isArray(ride.passengers) && ride.passengers.length) {
+  // An explicit empty passenger array means the accepted trip is open to two new riders.
+  if (Array.isArray(ride.passengers)) {
     return ride.passengers.reduce((sum, passenger) => sum + passengerSeats(passenger), 0)
   }
   const count = Number(ride.seats || 1)
@@ -61,7 +62,7 @@ function occupiedSeats(ride) {
 }
 
 function normalizePassengers(ride, fallbackStudent) {
-  if (Array.isArray(ride.passengers) && ride.passengers.length) return ride.passengers
+  if (Array.isArray(ride.passengers)) return ride.passengers
   return [{
     studentId: ride.studentId || fallbackStudent?.id,
     name: fallbackStudent?.name || 'Student',
@@ -417,9 +418,15 @@ router.post('/:id/cancel', requireAuth('student'), async (req, res) => {
       throw fail(403, 'You are not a passenger on this ride.')
     }
 
-    if (ride.studentId === req.user.id) {
-      ride.passengers = passengers.filter((passenger) => !passenger.isGuest && passenger.studentId !== req.user.id)
+    const wasRideOwner = ride.studentId === req.user.id
+    if (wasRideOwner) {
+      // Cancel the creator's booking (including their companion), but preserve
+      // every other registered passenger already travelling on this trip.
+      ride.passengers = passengers.filter((passenger) =>
+        passenger.isGuest || passenger.studentId !== req.user.id
+      ).filter((passenger) => !passenger.isGuest)
       if (ride.passengers.length) {
+        // The remaining registered passenger becomes the new ride owner.
         ride.studentId = ride.passengers[0].studentId
       }
     } else {
@@ -427,18 +434,32 @@ router.post('/:id/cancel', requireAuth('student'), async (req, res) => {
     }
 
     if (!ride.passengers.length) {
-      ride.status = 'cancelled'
-      ride.cancelledAt = new Date().toISOString()
-      ride.cancelledBy = 'student'
-      ride.driverId = null
-      delete ride.sharedGroupId
+      if (ride.status === 'pending' || !ride.driverId) {
+        // No driver has committed: remove this request from active listings.
+        ride.status = 'cancelled'
+        ride.cancelledAt = new Date().toISOString()
+        ride.cancelledBy = 'student'
+        ride.driverId = null
+        delete ride.sharedGroupId
+      } else {
+        // Driver already accepted: keep the trip itself alive and reopen
+        // both seats. The creator is no longer a passenger or owner.
+        ride.studentId = null
+        ride.passengers = []
+        ride.seats = 0
+        ride.passengerCount = 0
+        ride.farePerSeat = farePerSeat(ride.from, ride.to)
+        ride.fare = 0
+        ride.ownerCancelledAt = new Date().toISOString()
+        ride.ownerCancelledBy = req.user.id
+      }
     } else {
       recalculateRide(ride)
     }
     ride.updatedAt = new Date().toISOString()
-    return { ride, cancelled: true, seatReopened }
+    return { ride, cancelled: true, seatReopened, tripPreserved: ['accepted', 'arrived'].includes(ride.status) && Boolean(ride.driverId) }
   })
-  res.json({ ride: studentRideView(result.ride), cancelled: true, seatReopened: result.seatReopened })
+  res.json({ ride: studentRideView(result.ride), cancelled: true, seatReopened: result.seatReopened, tripPreserved: result.tripPreserved })
 })
 
 router.get('/mine', requireAuth('student'), async (req, res) => {
