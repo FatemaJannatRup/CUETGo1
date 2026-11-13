@@ -7,7 +7,7 @@ import { useFeedback } from '../context/FeedbackContext.jsx'
 export default function DriverLogin() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const { googleLogin, demoLogin } = useAuth()
+  const { googleLogin } = useAuth()
   const notify = useFeedback()
   const navigate = useNavigate()
   async function handleGoogle(credential) {
@@ -20,15 +20,7 @@ export default function DriverLogin() {
     notify('সফলভাবে লগইন হয়েছে।', 'success')
     navigate('/driver/home', { replace: true })
   }
-  async function handleDemo() {
-    if (busy) return
-    setError(''); setBusy(true)
-    const result = await demoLogin('driver')
-    setBusy(false)
-    if (!result.ok) return setError(result.message)
-    notify('ডেমো ড্রাইভার অ্যাকাউন্টে প্রবেশ করেছেন।', 'success')
-    navigate('/driver/home', { replace: true })
-  }
+
   return <div className="auth-page bn">
     <button onClick={() => navigate('/role')} className="auth-back">← ফিরে যান</button>
     <div className="auth-brand"><span className="auth-brand-mark">C</span><span>CUET<span className="auth-brand-accent">Go</span></span></div>
@@ -37,7 +29,7 @@ export default function DriverLogin() {
       <div className="auth-icon-tile">🛺</div><h2>আবার স্বাগতম</h2>
       <p className="auth-panel-copy">অ্যাকাউন্ট তৈরির সময় যে Gmail ব্যবহার করেছিলেন, সেটি বেছে নিন।</p>
       <div className="auth-google">{busy ? <p className="auth-progress">Gmail যাচাই হচ্ছে…</p> : <GoogleAuthButton onSuccess={handleGoogle} onError={setError} />}</div>
-      <button type="button" onClick={handleDemo} disabled={busy} className="secondary-btn w-full mt-3 py-3">ডেমো ড্রাইভার হিসেবে দেখুন</button>\n      {error && <p className="auth-error" role="alert">{error}</p>}
+      {error && <p className="auth-error" role="alert">{error}</p>}
       <p className="auth-privacy">শুধু নিবন্ধিত Gmail দিয়েই লগইন করা যাবে।</p>
     </div>
     <p className="auth-switch">নতুন চালক? <Link to="/driver/signup">অ্যাকাউন্ট খুলুন</Link></p>
