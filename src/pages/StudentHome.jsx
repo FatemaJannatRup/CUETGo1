@@ -5,6 +5,7 @@ import { useFeedback } from '../context/FeedbackContext.jsx'
 
 const HALLS = ['Muktijoddha Hall', 'Shahid Mohammad Shah Hall', 'Dr. Qudrat-E-Khuda Hall', 'Kabi Kazi Nazrul Islam Hall', 'Shaheed Tareq Huda Hall', 'Shaheed Abu Sayed Hall', 'Sufia Kamal Hall', 'Begum Shamsunnahar Khan Hall', 'Tapashi Rabeya Hall']
 const formatTime = (value) => new Date(value).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })
+const toLocalDateTimeInput = (date) => { const pad = (value) => String(value).padStart(2, '0'); return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + 'T' + pad(date.getHours()) + ':' + pad(date.getMinutes()) }
 const formatDateLabel = (date) => date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
 
 function genderLabel(g) {
@@ -98,7 +99,7 @@ export default function StudentHome() {
     if (!selectedDay) return
     const nextDate = new Date(selectedDay)
     nextDate.setHours(9, 0, 0, 0)
-    setForm((prev) => ({ ...prev, requestedTime: prev.requestedTime || nextDate.toISOString().slice(0, 16) }))
+    setForm((prev) => ({ ...prev, requestedTime: toLocalDateTimeInput(nextDate) }))
   }, [selectedDay])
 
   const handleRequestRide = async (event) => {
@@ -111,7 +112,7 @@ export default function StudentHome() {
     try {
       const payload = {
         ...form,
-        requestedTime: form.requestedTime || new Date(selectedDay).toISOString(),
+        requestedTime: form.requestedTime || toLocalDateTimeInput(new Date(new Date(selectedDay).setHours(9, 0, 0, 0))),
       }
       const result = await api.requestRide(payload)
       notify('Ride booked successfully.', 'success')
@@ -147,6 +148,23 @@ export default function StudentHome() {
       setError(err.message)
     } finally {
       setJoiningId(null)
+    }
+  }
+
+  const handleCancelRide = async (ride) => {
+    setError('')
+    setSuccess('')
+    const confirmed = window.confirm('Cancel your place in this ride? Any seat you release will become available to another student.')
+    if (!confirmed) return
+    notify('Cancelling your ride…', 'loading', 0)
+    try {
+      await api.cancelRide(ride.id)
+      notify('Your ride place was cancelled.', 'success')
+      setSuccess('Your ride place was cancelled and any released seat is available again.')
+      await refreshData()
+    } catch (err) {
+      notify(err.message, 'error')
+      setError(err.message)
     }
   }
 
@@ -246,7 +264,7 @@ export default function StudentHome() {
 
                 <div className="grid grid-cols-1 gap-3">
                   <label className="text-xs font-bold uppercase tracking-[0.14em] text-ink/60">Time</label>
-                  <input type="datetime-local" value={form.requestedTime} onChange={(e) => setForm({ ...form, requestedTime: e.target.value })} className="w-full rounded-2xl border border-sky-100 bg-sky-50 px-3 py-3 text-ink focus:outline-none focus:border-sky-400" />
+                  <input type="datetime-local" min={toLocalDateTimeInput(new Date(Date.now() + 2 * 60 * 1000 + 1000))} value={form.requestedTime} onChange={(e) => setForm({ ...form, requestedTime: e.target.value })} className="w-full rounded-2xl border border-sky-100 bg-sky-50 px-3 py-3 text-ink focus:outline-none focus:border-sky-400" />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -298,7 +316,10 @@ export default function StudentHome() {
                           <p className="text-xs text-ink/60 mt-1">{ride.hostName} • {formatTime(ride.requestedTime || ride.createdAt)}</p>
                           {ride.aiMatch && <p className="mt-2 text-xs font-semibold text-violet-700">✨ AI match · {ride.aiMatch.reason}</p>}
                         </div>
-                        <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold uppercase text-emerald-700">{Math.max(0, 2 - Number(ride.seats || 1))} left</span>
+                        <div className="flex flex-col items-end gap-2">
+                          <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold uppercase text-emerald-700">{ride.seatsLeft ?? Math.max(0, 2 - Number(ride.seats || 1))} left</span>
+                          <button onClick={() => handleJoinRide(ride)} disabled={joiningId === ride.id || (ride.seatsLeft ?? Math.max(0, 2 - Number(ride.seats || 1))) < 1} className="primary-btn px-3 py-2 text-[10px] uppercase tracking-[0.10em] disabled:opacity-50">{joiningId === ride.id ? 'Joining…' : 'Join'}</button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -352,6 +373,9 @@ export default function StudentHome() {
                       </div>
                       <p className="text-xs text-ink/60 mt-2">{formatTime(ride.requestedTime || ride.createdAt)} • {ride.seats || 1} seat(s)</p>
                       <p className="text-xs text-ink/60 mt-1">Passengers: {ride.passengers?.map((item) => item.name).join(', ') || '1 rider'}</p>
+                      {['pending', 'accepted'].includes(ride.status) && new Date(ride.requestedTime || ride.createdAt).getTime() - Date.now() > 2 * 60 * 1000 && (
+                        <button onClick={() => handleCancelRide(ride)} className="secondary-btn w-full mt-3 py-2 text-xs uppercase tracking-[0.12em]">Cancel my place</button>
+                      )}
                     </div>
                   ))}
                 </div>
