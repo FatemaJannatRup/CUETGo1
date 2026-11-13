@@ -51,6 +51,7 @@ export const api = {
   adminCancelRide: (id) => adminRequest(`/rides/${encodeURIComponent(id)}/cancel`, { method: 'PATCH' }),
   googleSignup: (payload) => request('/auth/google/signup', { method: 'POST', body: payload }),
   googleLogin: (payload) => request('/auth/google/login', { method: 'POST', body: payload }),
+  demoLogin: (role) => request('/auth/demo-login', { method: 'POST', body: { role } }),
   me: () => request('/auth/me', { auth: true }),
   updateProfile: (payload) => request('/auth/profile', { method: 'PUT', body: payload, auth: true }),
   routes: () => request('/rides/routes'),
