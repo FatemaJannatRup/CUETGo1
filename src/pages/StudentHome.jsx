@@ -292,6 +292,7 @@ export default function StudentHome() {
                   </div>
                 )}
 
+                <p className="text-xs text-ink/60">Bookings and passenger changes close automatically 2 minutes before pickup. You can still book a ride shortly before departure.</p>
                 <button type="submit" disabled={busy} className="primary-btn w-full py-3.5 text-sm uppercase tracking-[0.16em]">
                   {busy ? 'Booking...' : 'Book ride'}
                 </button>
@@ -338,7 +339,7 @@ export default function StudentHome() {
               ) : (
                 <div className="space-y-3">
                   {openRides.map((ride) => {
-                    const seatsLeft = Math.max(0, 2 - Number(ride.seats || 1))
+                    const seatsLeft = Number.isFinite(Number(ride.seatsLeft)) ? Number(ride.seatsLeft) : Math.max(0, 2 - Number(ride.seats || 1))
                     return (
                       <div key={ride.id} className="rounded-2xl border border-sky-100 bg-white p-3 shadow-sm">
                         <div className="flex justify-between">
@@ -346,6 +347,7 @@ export default function StudentHome() {
                           <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold uppercase text-emerald-700">{seatsLeft} left</span>
                         </div>
                         <p className="text-xs text-ink/60 mt-2">{ride.hostName} • {formatTime(ride.requestedTime || ride.createdAt)}</p>
+                        <p className="text-[11px] text-ink/50 mt-1">{ride.status === 'accepted' ? 'Driver accepted' : 'Waiting for a driver'} • Booking closes 2 minutes before pickup</p>
                         <div className="mt-3 flex justify-between items-center">
                           <span className="text-xs text-ink/60">{ride.passengers?.length || 1} rider(s)</span>
                           <button onClick={() => handleJoinRide(ride)} disabled={joiningId === ride.id || seatsLeft === 0} className="primary-btn px-4 py-2 text-xs uppercase tracking-[0.12em] disabled:opacity-50">
