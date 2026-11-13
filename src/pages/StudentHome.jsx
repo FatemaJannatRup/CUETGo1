@@ -92,7 +92,7 @@ export default function StudentHome() {
   }, [openRides, rides, user?.hall, form.from, form.to])
 
   const pendingRides = rides.filter((ride) => ride.status === 'pending')
-  const acceptedRides = rides.filter((ride) => ride.status === 'accepted')
+  const acceptedRides = rides.filter((ride) => ['accepted', 'arrived', 'in_progress'].includes(ride.status))
   const completedRides = rides.filter((ride) => ride.status === 'completed')
 
   useEffect(() => {
