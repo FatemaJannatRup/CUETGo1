@@ -97,6 +97,11 @@ function sameRoute(a, b) {
   return a.from === b.from && a.to === b.to
 }
 
+function assignedRideGroup(db, target, driverId) {
+  if (!target.sharedGroupId) return [target]
+  return db.rides.filter((ride) => ride.sharedGroupId === target.sharedGroupId && ride.driverId === driverId)
+}
+
 function validSharedGroup(rides) {
   if (!Array.isArray(rides) || rides.length < 1 || rides.length > 2) return false
   if (!rides.every((ride) => sameRoute(ride, rides[0]))) return false
@@ -442,9 +447,11 @@ router.post('/accept', requireAuth('driver'), requireApprovedDriver, async (req,
     ))
     if (conflict) throw fail(409, 'This request overlaps with another accepted trip in your schedule.')
 
+    const sharedGroupId = crypto.randomUUID()
     for (const ride of selected) {
       ride.status = 'accepted'
       ride.driverId = req.user.id
+      ride.sharedGroupId = sharedGroupId
       ride.acceptedAt = new Date().toISOString()
       ride.updatedAt = ride.acceptedAt
     }
@@ -459,26 +466,31 @@ router.post('/:id/driver-cancel', requireAuth('driver'), requireApprovedDriver, 
       item.id === req.params.id && item.driverId === req.user.id && ['accepted', 'arrived'].includes(item.status)
     )
     if (!target) throw fail(404, 'Accepted ride not found.')
+    const group = assignedRideGroup(db, target, req.user.id)
+    if (group.some((ride) => !['accepted', 'arrived'].includes(ride.status))) {
+      throw fail(409, 'This shared trip has already changed status. Refresh and try again.')
+    }
     const now = Date.now()
-    target.driverCancelledAt = new Date().toISOString()
-    target.driverCancelReason = String(req.body?.reason || '').slice(0, 240)
-    target.updatedAt = target.driverCancelledAt
-
-    if (pickupTime(target) <= now) {
-      target.status = 'cancelled'
-      return { ride: target, reopened: false, replacementNeeded: false }
+    const cancelledAt = new Date().toISOString()
+    let reopened = false
+    let replacementNeeded = false
+    for (const ride of group) {
+      ride.driverCancelledAt = cancelledAt
+      ride.driverCancelReason = String(req.body?.reason || '').slice(0, 240)
+      ride.updatedAt = cancelledAt
+      if (pickupTime(ride) <= now) {
+        ride.status = 'cancelled'
+      } else {
+        // Preserve the passenger group after cutoff, but return the trip to the
+        // driver queue so another approved driver can take it before pickup.
+        ride.status = 'pending'
+        ride.driverId = null
+        ride.bookingLocked = pickupTime(ride) - now <= BOOKING_CUTOFF_MS
+        reopened = reopened || !ride.bookingLocked
+        replacementNeeded = true
+      }
     }
-
-    // Keep the passenger group intact after cutoff, but return the trip to the
-    // driver queue so another approved driver can take it before pickup.
-    target.status = 'pending'
-    target.driverId = null
-    target.bookingLocked = pickupTime(target) - now <= BOOKING_CUTOFF_MS
-    return {
-      ride: target,
-      reopened: !target.bookingLocked,
-      replacementNeeded: true,
-    }
+    return { rides: group, reopened, replacementNeeded }
   })
   res.json(ride)
 })
@@ -493,17 +505,21 @@ router.post('/:id/status', requireAuth('driver'), requireApprovedDriver, async (
       item.id === req.params.id && item.driverId === req.user.id
     )
     if (!target) throw fail(404, 'Assigned ride not found.')
-    const allowed = (nextStatus === 'arrived' && target.status === 'accepted') ||
-      (nextStatus === 'in_progress' && target.status === 'arrived')
-    if (!allowed) throw fail(409, 'The ride status has changed. Refresh and try again.')
-    if (nextStatus === 'in_progress' && pickupTime(target) - Date.now() > BOOKING_CUTOFF_MS) {
+    const group = assignedRideGroup(db, target, req.user.id)
+    const expectedStatus = nextStatus === 'arrived' ? 'accepted' : 'arrived'
+    if (group.some((ride) => ride.status !== expectedStatus)) {
+      throw fail(409, 'The shared trip status has changed. Refresh and try again.')
+    }
+    if (nextStatus === 'in_progress' && group.some((ride) => pickupTime(ride) - Date.now() > BOOKING_CUTOFF_MS)) {
       throw fail(409, 'The trip can start only after the two-minute booking window has closed.')
     }
     const timestamp = new Date().toISOString()
-    target.status = nextStatus
-    if (nextStatus === 'arrived') target.arrivedAt = timestamp
-    if (nextStatus === 'in_progress') target.startedAt = timestamp
-    target.updatedAt = timestamp
+    for (const ride of group) {
+      ride.status = nextStatus
+      if (nextStatus === 'arrived') ride.arrivedAt = timestamp
+      if (nextStatus === 'in_progress') ride.startedAt = timestamp
+      ride.updatedAt = timestamp
+    }
     return target
   })
   res.json({ ride })
@@ -515,10 +531,17 @@ router.post('/:id/complete', requireAuth('driver'), requireApprovedDriver, async
       item.id === req.params.id && item.driverId === req.user.id && item.status === 'in_progress'
     )
     if (!target) throw fail(404, 'Accepted ride not found.')
-    target.status = 'completed'
-    target.completedAt = new Date().toISOString()
-    target.paidOut = false
-    target.updatedAt = target.completedAt
+    const group = assignedRideGroup(db, target, req.user.id)
+    if (group.some((ride) => ride.status !== 'in_progress')) {
+      throw fail(409, 'The shared trip status has changed. Refresh and try again.')
+    }
+    const completedAt = new Date().toISOString()
+    for (const ride of group) {
+      ride.status = 'completed'
+      ride.completedAt = completedAt
+      ride.paidOut = false
+      ride.updatedAt = completedAt
+    }
     return target
   })
   res.json({ ride })
