@@ -1,31 +1,26 @@
 import fetch from 'node-fetch'
+import { LOCATIONS } from '../constants/campusLocations.js'
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent'
 
 const minutesApart = (a, b) =>
   Math.abs(new Date(a.requestedTime || a.createdAt).getTime() - new Date(b.requestedTime || b.createdAt).getTime()) / 60000
 
-function routeSimilarity(a, b) {
-  if (a.from === b.from && a.to === b.to) return 100
-  if (a.from === b.from || a.to === b.to) return 75
-  if (a.from === b.to || a.to === b.from) return 55
-  return 0
-}
-
 function scoreCandidate(target, candidate) {
   const gap = minutesApart(target, candidate)
-  const route = routeSimilarity(target, candidate)
-  if (!Number.isFinite(gap) || gap > 10 || route !== 100) return null
+  // A shared ride is valid only when the complete CUET journey is identical.
+  // Matching one endpoint, or matching the endpoints in reverse order, is not
+  // enough: it can send a student in the wrong direction.
+  if (!LOCATIONS.includes(target.from) || !LOCATIONS.includes(target.to) || target.from === target.to) return null
+  if (!LOCATIONS.includes(candidate.from) || !LOCATIONS.includes(candidate.to)) return null
+  if (candidate.from !== target.from || candidate.to !== target.to) return null
+  if (!Number.isFinite(gap) || gap > 10) return null
   if (Number(target.seats || 1) !== 1 || Number(candidate.seats || 1) >= 2) return null
   const timeScore = Math.max(0, 20 - gap * 2)
   return {
     rideId: candidate.id,
-    score: Math.round(route * 0.6 + timeScore),
-    reason: route === 100
-      ? `Same pickup and destination; ${Math.round(gap)} min apart`
-      : route >= 75
-        ? `Shares a ${target.from === candidate.from ? 'pickup' : 'destination'} point and has compatible timing`
-        : 'Reverse-direction route with compatible timing',
+    score: Math.round(100 * 0.6 + timeScore),
+    reason: `Exact same CUET pickup and destination; ${Math.round(gap)} min apart`,
   }
 }
 
@@ -47,7 +42,7 @@ export async function findMatches(target, candidates, options = {}) {
   if (!key || options.useAI === false) return pool
 
   const allowed = new Set(pool.map((item) => item.rideId))
-  const prompt = `You are assisting a campus shared-rickshaw service. Rank only the supplied feasible candidate ride IDs. Consider same/shared pickup or destination, requested time proximity, and seat capacity already checked by the system. Do not invent IDs or claim a route is feasible if it is not. Return ONLY JSON: [{"rideId":"...","reason":"short explanation"}]. Candidates: ${JSON.stringify(pool)}`
+  const prompt = `You are assisting a campus shared-rickshaw service. Rank only the supplied feasible candidate ride IDs. All candidates already have the exact same pickup and destination in the same direction, are within 10 minutes, and have enough seats. Do not broaden route compatibility. Do not invent IDs or claim a route is feasible if it is not. Return ONLY JSON: [{"rideId":"...","reason":"short explanation"}]. Candidates: ${JSON.stringify(pool)}`
 
   try {
     const res = await fetch(GEMINI_URL, {

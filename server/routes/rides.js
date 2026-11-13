@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import { readDb, mutateDb } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
 import { findMatches, optimizeSharedRoute } from '../services/gemini.js'
+import { HALLS, LOCATIONS } from '../constants/campusLocations.js'
 
 const router = Router()
 const BOOKING_CUTOFF_MS = 2 * 60 * 1000
@@ -24,13 +25,6 @@ async function requireApprovedDriver(req, res, next) {
     next()
   } catch (error) { next(error) }
 }
-
-const HALLS = [
-  'Muktijoddha Hall', 'Shahid Mohammad Shah Hall', 'Dr. Qudrat-E-Khuda Hall',
-  'Kabi Kazi Nazrul Islam Hall', 'Shaheed Tareq Huda Hall', 'Shaheed Abu Sayed Hall',
-  'Sufia Kamal Hall', 'Begum Shamsunnahar Khan Hall', 'Tapashi Rabeya Hall',
-]
-const LOCATIONS = [...HALLS, 'CUET Main Gate', 'Academic Building', 'Central Library', 'Cafeteria']
 
 function fail(status, message) {
   const error = new Error(message)
@@ -261,7 +255,13 @@ router.post('/request', requireAuth('student'), async (req, res) => {
 
 router.post('/:id/join', requireAuth('student'), async (req, res) => {
   const seatCount = Number(req.body?.seats || 1)
+  const coPassengerName = String(req.body?.coPassengerName || '').trim()
+  const coPassengerPhone = String(req.body?.coPassengerPhone || '').trim()
+  const coPassengerInfo = String(req.body?.coPassengerInfo || '').trim()
   if (![1, 2].includes(seatCount)) return res.status(400).json({ message: 'Choose 1 or 2 seats.' })
+  if (seatCount === 2 && (!coPassengerName || !coPassengerPhone)) {
+    return res.status(400).json({ message: 'For 2 seats, add the companion name and phone number.' })
+  }
 
   const ride = await mutateDb((db) => {
     const target = db.rides.find((item) => item.id === req.params.id)
@@ -298,15 +298,27 @@ router.post('/:id/join', requireAuth('student'), async (req, res) => {
     }
 
     target.passengers = normalizePassengers(target, db.students.find((item) => item.id === target.studentId))
+    const joinedAt = new Date().toISOString()
     target.passengers.push({
       studentId: student.id,
       name: student.username || student.name,
       phone: String(req.body?.phone || student.phone || ''),
       info: 'Joined ride',
-      seatCount,
+      seatCount: 1,
       isGuest: false,
-      joinedAt: new Date().toISOString(),
+      joinedAt,
     })
+    if (seatCount === 2) {
+      target.passengers.push({
+        studentId: 'guest-' + crypto.randomUUID(),
+        name: coPassengerName,
+        phone: coPassengerPhone,
+        info: coPassengerInfo || 'Companion passenger',
+        seatCount: 1,
+        isGuest: true,
+        joinedAt,
+      })
+    }
     recalculateRide(target)
     target.updatedAt = new Date().toISOString()
     return target

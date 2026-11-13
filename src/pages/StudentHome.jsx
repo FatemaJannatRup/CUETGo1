@@ -26,6 +26,8 @@ export default function StudentHome() {
   useEffect(() => { sessionStorage.setItem('cuetgo_student_tab', tab) }, [tab])
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [cancelRideTarget, setCancelRideTarget] = useState(null)
+  const [canceling, setCanceling] = useState(false)
   const [joiningId, setJoiningId] = useState(null)
   const [editingProfile, setEditingProfile] = useState(false)
   const [profileForm, setProfileForm] = useState({ username: user?.username || user?.name || '', hall: user?.hall || '', gender: user?.gender || '' })
@@ -76,20 +78,35 @@ export default function StudentHome() {
   }, [])
 
   const recommendedRides = useMemo(() => {
-    const matchDetails = new Map()
-    rides.forEach((request) => {
-      ;(request.matchDetails || []).forEach((match) => matchDetails.set(match.rideId, match))
-    })
+    // Recommendations are strict whole-journey matches, not independent
+    // pickup/destination matches. Only CUET location IDs from the server list
+    // can be selected, and both endpoints must match in the same direction.
+    if (!form.from || !form.to || form.from === form.to || !locations.includes(form.from) || !locations.includes(form.to)) return []
+
+    const requestedAt = Date.parse(form.requestedTime)
+    if (!Number.isFinite(requestedAt)) return []
+    const requestedSeats = Math.max(1, Math.min(2, Number(form.seats) || 1))
+    const timeWindowMs = 10 * 60 * 1000
+
     return openRides
+      .filter((ride) => {
+        if (ride.from !== form.from || ride.to !== form.to) return false
+        if (!locations.includes(ride.from) || !locations.includes(ride.to)) return false
+        if (!['pending', 'accepted', 'arrived'].includes(ride.status)) return false
+        const rideTime = Date.parse(ride.requestedTime || ride.createdAt)
+        if (!Number.isFinite(rideTime) || Math.abs(rideTime - requestedAt) > timeWindowMs) return false
+        const seatsLeft = Number.isFinite(Number(ride.seatsLeft))
+          ? Number(ride.seatsLeft)
+          : Math.max(0, 2 - Number(ride.seats || 1))
+        return seatsLeft >= requestedSeats
+      })
       .map((ride) => ({
         ...ride,
-        aiMatch: matchDetails.get(ride.id) || null,
-        relevance: matchDetails.has(ride.id) ? 100 : (ride.from === form.from ? 30 : 0) + (ride.to === form.to ? 30 : 0) + (ride.from === user?.hall || ride.to === user?.hall ? 10 : 0),
+        timeDifferenceMinutes: Math.round(Math.abs(Date.parse(ride.requestedTime || ride.createdAt) - requestedAt) / 60000),
       }))
-      .filter((ride) => ride.aiMatch || ride.relevance > 0)
-      .sort((a, b) => b.relevance - a.relevance)
+      .sort((a, b) => a.timeDifferenceMinutes - b.timeDifferenceMinutes)
       .slice(0, 3)
-  }, [openRides, rides, user?.hall, form.from, form.to])
+  }, [openRides, locations, form.from, form.to, form.requestedTime, form.seats])
 
   const pendingRides = rides.filter((ride) => ride.status === 'pending')
   const acceptedRides = rides.filter((ride) => ['accepted', 'arrived', 'in_progress'].includes(ride.status))
@@ -147,7 +164,14 @@ export default function StudentHome() {
     setError('')
     setSuccess('')
     try {
-      const payload = { seats: 1, phone: user?.phone || '', info: 'Joining this ride' }
+      const payload = {
+        seats: Math.max(1, Math.min(2, Number(form.seats) || 1)),
+        phone: user?.phone || '',
+        info: 'Joining this ride',
+        coPassengerName: form.coPassengerName,
+        coPassengerPhone: form.coPassengerPhone,
+        coPassengerInfo: form.coPassengerInfo,
+      }
       await api.joinRide(ride.id, payload)
       notify('You joined the ride successfully.', 'success')
       setSuccess('You joined the ride successfully.')
@@ -160,20 +184,27 @@ export default function StudentHome() {
     }
   }
 
-  const handleCancelRide = async (ride) => {
+  const handleCancelRide = (ride) => {
     setError('')
     setSuccess('')
-    const confirmed = window.confirm('Cancel your place in this ride? Any seat you release will become available to another student.')
-    if (!confirmed) return
+    setCancelRideTarget(ride)
+  }
+
+  const confirmCancelRide = async () => {
+    if (!cancelRideTarget) return
+    setCanceling(true)
     notify('Cancelling your ride…', 'loading', 0)
     try {
-      const result = await api.cancelRide(ride.id)
+      const result = await api.cancelRide(cancelRideTarget.id)
+      setCancelRideTarget(null)
       notify('Your ride place was cancelled.', 'success')
       setSuccess(result.seatReopened ? 'Your place was cancelled and the seat is available to another student.' : 'Your place was cancelled. The seat stays locked because the booking cutoff has passed.')
       await refreshData()
     } catch (err) {
       notify(err.message, 'error')
       setError(err.message)
+    } finally {
+      setCanceling(false)
     }
   }
 
@@ -205,7 +236,7 @@ export default function StudentHome() {
             <p className="text-ink/70 text-xs uppercase tracking-[0.2em]">Student Dashboard</p>
             <h1 className="text-2xl font-bold mt-2">{user?.name || 'Student'}</h1>
           </div>
-          <button onClick={() => { notify('Logging out…', 'loading', 0); window.setTimeout(logout, 500) }} className="text-sm font-semibold text-ink/80 underline">Log out</button>
+          <button type="button" onClick={logout} className="text-sm font-semibold text-ink/80 underline">Log out</button>
         </div>
 
         <div className="mt-5 flex items-center justify-between rounded-2xl bg-white/30 backdrop-blur-sm border border-white/40 px-3 py-2 shadow-soft">
@@ -218,17 +249,19 @@ export default function StudentHome() {
       </header>
 
       <main className="app-main flex-1 px-5 py-5 overflow-y-auto">
-        <div className="app-tabs flex gap-2 mb-5">
+        <nav className="app-tabs flex gap-2 mb-5" aria-label="Student dashboard sections">
           {['dashboard', 'rides', 'profile'].map((value) => (
             <button
               key={value}
+              type="button"
+              aria-pressed={tab === value}
               onClick={() => setTab(value)}
               className={`flex-1 rounded-full px-3 py-2 text-xs font-bold uppercase tracking-[0.12em] ${tab === value ? 'bg-sky-500 text-white shadow-soft' : 'bg-white text-ink/70 border border-sky-100'}`}
             >
               {value}
             </button>
           ))}
-        </div>
+        </nav>
 
         {error && <div className="mb-4 rounded-2xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{error}</div>}
         {success && <div className="mb-4 rounded-2xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-sm text-emerald-700">{success}</div>}
@@ -315,7 +348,7 @@ export default function StudentHome() {
               </div>
 
               {recommendedRides.length === 0 ? (
-                <p className="text-sm text-ink/60">No matching rides yet. Try another route or time.</p>
+                <p className="text-sm text-ink/60">{!form.from || !form.to || form.from === form.to ? 'Choose two different CUET locations to see matching rides.' : 'No exact CUET route matches near your selected departure time with enough available seats.'}</p>
               ) : (
                 <div className="space-y-3">
                   {recommendedRides.map((ride) => (
@@ -324,7 +357,7 @@ export default function StudentHome() {
                         <div>
                           <p className="font-bold text-ink">{ride.from} → {ride.to}</p>
                           <p className="text-xs text-ink/60 mt-1">{ride.hostName} • {formatTime(ride.requestedTime || ride.createdAt)}</p>
-                          {ride.aiMatch && <p className="mt-2 text-xs font-semibold text-violet-700">✨ AI match · {ride.aiMatch.reason}</p>}
+                          <p className="mt-2 text-xs text-ink/60">Exact CUET route match · {ride.timeDifferenceMinutes === 0 ? 'Same departure time' : `${ride.timeDifferenceMinutes} min from your selected time`}</p>
                         </div>
                         <div className="flex flex-col items-end gap-2">
                           <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold uppercase text-emerald-700">{ride.seatsLeft ?? Math.max(0, 2 - Number(ride.seats || 1))} left</span>
@@ -482,6 +515,20 @@ export default function StudentHome() {
           </div>
         )}
       </main>
+      {cancelRideTarget && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-5 backdrop-blur-sm" onClick={() => !canceling && setCancelRideTarget(null)}>
+          <section role="dialog" aria-modal="true" aria-labelledby="student-cancel-title" className="w-full max-w-sm rounded-3xl border border-white/70 bg-white p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-2xl">⚠️</div>
+            <h2 id="student-cancel-title" className="text-lg font-bold text-ink">Cancel your ride place?</h2>
+            <p className="mt-2 text-sm leading-relaxed text-ink/65">Are you sure you want to cancel this ride? Any seat released will become available to another student, if the booking cutoff has not passed.</p>
+            <div className="mt-4 rounded-2xl bg-sky-50 p-3 text-sm font-semibold text-ink">{cancelRideTarget.from} → {cancelRideTarget.to}</div>
+            <div className="mt-5 flex gap-2">
+              <button type="button" disabled={canceling} onClick={() => setCancelRideTarget(null)} className="secondary-btn flex-1 rounded-xl px-3 py-3 text-sm">Keep ride</button>
+              <button type="button" disabled={canceling} onClick={confirmCancelRide} className="flex-1 rounded-xl bg-rose-600 px-3 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60">{canceling ? 'Cancelling…' : 'Yes, cancel'}</button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   )
 }
