@@ -777,15 +777,54 @@ body {
   z-index: 200;
   left: 50%;
   bottom: max(20px, env(safe-area-inset-bottom));
-  width: max-content;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
   max-width: min(92vw, 440px);
+  min-height: 0;
+  padding: 12px 16px;
   transform: translateX(-50%);
-  border: 1px solid rgba(255,255,255,.16);
+  border: 1px solid rgba(255,255,255,.14);
   border-radius: 14px;
   background: #173642;
   color: #fff;
-  box-shadow: 0 12px 36px rgba(12,35,44,.22);
+  box-shadow: 0 12px 32px rgba(12,35,44,.20);
+  font: 600 13px/1.45 Inter, "Segoe UI", system-ui, sans-serif;
+  overflow-wrap: anywhere;
+  animation: cuetgo-toast-in .22s ease-out both;
+  pointer-events: none;
 }
+.cuetgo-feedback > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cuetgo-feedback-icon {
+  width: 21px;
+  height: 21px;
+  flex: 0 0 21px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255,255,255,.14);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 800;
+}
+.cuetgo-feedback-success { background: #155b49; border-color: rgba(186,238,216,.2); }
+.cuetgo-feedback-error { background: #71343d; border-color: rgba(255,210,215,.2); }
+.cuetgo-feedback-loading { background: #244d63; }
+.cuetgo-feedback-spinner {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border: 2px solid rgba(255,255,255,.28);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: cuetgo-spin .7s linear infinite;
+}
+
 @media (max-width: 600px) {
   .phone-shell { min-height: 100vh; min-height: 100dvh; padding: 0; background: var(--cuet-bg); }
   .phone-screen:not(:has(.admin-page)) {
