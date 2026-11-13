@@ -364,11 +364,11 @@ export default function StudentHome() {
                       <div className="flex justify-between items-center">
                         <div>
                           <p className="font-bold text-ink">{ride.from} → {ride.to}</p>
-                          <p className="text-xs text-ink/60 mt-1">{ride.hostName} • {formatRideDate(ride.requestedTime || ride.createdAt)}</p>
+                          <div className="ride-time-block"><span className="ride-time-date">{formatRideDate(ride.requestedTime || ride.createdAt)}</span><strong className="ride-time-clock">{formatRideClock(ride.requestedTime || ride.createdAt)}</strong></div><p className="ride-host-name">{ride.hostName}</p>
                           <p className="mt-2 text-xs text-ink/60">Exact CUET route match · {ride.timeDifferenceMinutes === 0 ? 'Same departure time' : `${ride.timeDifferenceMinutes} min from your selected time`}</p>
                         </div>
                         <div className="flex flex-col items-end gap-2">
-                          <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold uppercase text-emerald-700">{ride.seatsLeft ?? Math.max(0, 2 - Number(ride.seats || 1))} left</span>
+                          <span className="ride-status-pill ride-status-open">{ride.seatsLeft ?? Math.max(0, 2 - Number(ride.seats || 1))} LEFT</span>
                           <button onClick={() => handleJoinRide(ride)} disabled={joiningId === ride.id || (ride.seatsLeft ?? Math.max(0, 2 - Number(ride.seats || 1))) < 1} className="primary-btn px-3 py-2 text-[10px] uppercase tracking-[0.10em] disabled:opacity-50">{joiningId === ride.id ? 'Joining…' : 'Join'}</button>
                         </div>
                       </div>
