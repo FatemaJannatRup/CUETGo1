@@ -110,6 +110,24 @@ function studentName(db, studentId) {
   return student ? (student.username || student.name) : 'Student'
 }
 
+async function readDbAndExpirePending() {
+  const snapshot = await readDb()
+  const now = Date.now()
+  const hasExpired = snapshot.rides.some((ride) => ride.status === 'pending' && pickupTime(ride) <= now)
+  if (!hasExpired) return snapshot
+  return mutateDb((db) => {
+    const expiredAt = new Date().toISOString()
+    for (const ride of db.rides) {
+      if (ride.status === 'pending' && pickupTime(ride) <= now) {
+        ride.status = 'expired'
+        ride.expiredAt = expiredAt
+        ride.updatedAt = expiredAt
+      }
+    }
+    return db
+  })
+}
+
 router.get('/routes', (req, res) => {
   res.json({ locations: LOCATIONS, halls: HALLS })
 })
@@ -117,7 +135,7 @@ router.get('/routes', (req, res) => {
 // Students can see both unassigned and driver-accepted rides while the group
 // still has a seat. No passenger may join during the final two minutes.
 router.get('/open', requireAuth('student'), async (req, res) => {
-  const db = await readDb()
+  const db = await readDbAndExpirePending()
   const now = Date.now()
   const rides = db.rides
     .filter((ride) =>
@@ -323,7 +341,7 @@ router.post('/:id/cancel', requireAuth('student'), async (req, res) => {
 })
 
 router.get('/mine', requireAuth('student'), async (req, res) => {
-  const db = await readDb()
+  const db = await readDbAndExpirePending()
   const mine = db.rides
     .filter((ride) => studentIsOnRide(ride, req.user.id))
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
@@ -343,7 +361,7 @@ router.get('/mine', requireAuth('student'), async (req, res) => {
 })
 
 router.get('/pending', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
-  const db = await readDb()
+  const db = await readDbAndExpirePending()
   const pending = db.rides
     .filter((ride) => ride.status === 'pending' && pickupTime(ride) > Date.now())
     .sort((a, b) => pickupTime(a) - pickupTime(b))
@@ -470,7 +488,7 @@ router.post('/:id/complete', requireAuth('driver'), requireApprovedDriver, async
 })
 
 router.get('/mine-driver', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
-  const db = await readDb()
+  const db = await readDbAndExpirePending()
   const mine = db.rides
     .filter((ride) => ride.driverId === req.user.id)
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
