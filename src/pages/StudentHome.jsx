@@ -167,9 +167,9 @@ export default function StudentHome() {
     if (!confirmed) return
     notify('Cancelling your ride…', 'loading', 0)
     try {
-      await api.cancelRide(ride.id)
+      const result = await api.cancelRide(ride.id)
       notify('Your ride place was cancelled.', 'success')
-      setSuccess('Your ride place was cancelled and any released seat is available again.')
+      setSuccess(result.seatReopened ? 'Your place was cancelled and the seat is available to another student.' : 'Your place was cancelled. The seat stays locked because the booking cutoff has passed.')
       await refreshData()
     } catch (err) {
       notify(err.message, 'error')
@@ -385,8 +385,8 @@ export default function StudentHome() {
                       <p className="text-xs text-ink/60 mt-2">{formatTime(ride.requestedTime || ride.createdAt)} • {ride.seats || 1} seat(s)</p>
                       <p className="text-xs text-ink/60 mt-1">Passengers: {ride.passengers?.map((item) => item.name).join(', ') || '1 rider'}</p>
                       {ride.driverCancelledAt && ride.status === 'pending' && <p className="text-xs text-amber-700 mt-1">Your previous driver cancelled. CUETGo is looking for a replacement driver.</p>}
-                      {['pending', 'accepted', 'arrived'].includes(ride.status) && new Date(ride.requestedTime || ride.createdAt).getTime() - Date.now() > 2 * 60 * 1000 && (
-                        <button onClick={() => handleCancelRide(ride)} className="secondary-btn w-full mt-3 py-2 text-xs uppercase tracking-[0.12em]">Cancel my place</button>
+                      {['pending', 'accepted', 'arrived'].includes(ride.status) && new Date(ride.requestedTime || ride.createdAt).getTime() > Date.now() && (
+                        <button onClick={() => handleCancelRide(ride)} className="secondary-btn w-full mt-3 py-2 text-xs uppercase tracking-[0.12em]">{new Date(ride.requestedTime || ride.createdAt).getTime() - Date.now() > 2 * 60 * 1000 ? 'Cancel my place' : 'Cancel (seat stays closed)'}</button>
                       )}
                     </div>
                   ))}
