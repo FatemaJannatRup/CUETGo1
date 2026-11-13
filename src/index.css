@@ -495,3 +495,66 @@ button:active { transform: scale(.985); }
 }
 .route-transition > * { flex: 1 0 auto; }
 .auth-page, .welcome-page, .role-page { min-height: 100%; flex: 1 0 auto; }
+
+
+/* Product polish: predictable typography, readable controls and calmer navigation. */
+html, body {
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+.app-dashboard {
+  font-family: Inter, "Noto Sans Bengali", "Segoe UI", sans-serif;
+  line-height: 1.5;
+}
+.app-dashboard h1, .app-dashboard h2, .app-dashboard h3 {
+  line-height: 1.25;
+}
+.app-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  padding: 6px;
+  margin-left: -2px;
+  margin-right: -2px;
+  background: rgba(244, 248, 250, .94);
+  border: 1px solid rgba(216, 230, 237, .8);
+  backdrop-filter: blur(12px);
+}
+.app-tabs button {
+  min-height: 42px;
+  white-space: nowrap;
+}
+.app-dashboard form button,
+.app-dashboard form input,
+.app-dashboard form select,
+.app-dashboard form textarea {
+  min-height: 44px;
+}
+.app-dashboard button:disabled {
+  cursor: not-allowed;
+  filter: saturate(.65);
+}
+.app-dashboard .app-card p,
+.app-dashboard .app-card label {
+  line-height: 1.55;
+}
+.app-dashboard input::placeholder,
+.app-dashboard textarea::placeholder {
+  color: #8a9daa;
+  opacity: 1;
+}
+.app-dashboard select:focus-visible,
+.app-dashboard input:focus-visible,
+.app-dashboard textarea:focus-visible {
+  outline: 3px solid rgba(49, 137, 184, .2);
+  outline-offset: 1px;
+}
+.app-card, .admin-panel {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 380px) {
+  .app-tabs { gap: 3px !important; padding: 4px; }
+  .app-tabs button { padding-left: 5px; padding-right: 5px; font-size: 9px !important; }
+  .app-main { padding-left: 13px !important; padding-right: 13px !important; }
+}
