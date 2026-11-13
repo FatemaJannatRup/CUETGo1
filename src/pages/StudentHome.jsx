@@ -110,14 +110,17 @@ export default function StudentHome() {
     setSuccess('')
 
     try {
+      const localPickupValue = form.requestedTime || toLocalDateTimeInput(new Date(new Date(selectedDay).setHours(9, 0, 0, 0)))
       const payload = {
         ...form,
-        requestedTime: form.requestedTime || toLocalDateTimeInput(new Date(new Date(selectedDay).setHours(9, 0, 0, 0))),
+        // datetime-local values are browser-local; send an explicit UTC instant
+        // so Render's server timezone cannot shift a Bangladesh pickup by 6 hours.
+        requestedTime: new Date(localPickupValue).toISOString(),
       }
       const result = await api.requestRide(payload)
       notify('Ride booked successfully.', 'success')
       setSuccess(`Ride request created for ${payload.from} → ${payload.to}.`)
-      setForm({ ...form, from: user?.hall || '', to: 'Academic Building', requestedTime: payload.requestedTime, seats: 1, coPassengerName: '', coPassengerPhone: '', coPassengerInfo: '' })
+      setForm({ ...form, from: user?.hall || '', to: 'Academic Building', requestedTime: toLocalDateTimeInput(new Date(payload.requestedTime)), seats: 1, coPassengerName: '', coPassengerPhone: '', coPassengerInfo: '' })
       await refreshData()
       setTab('rides')
       setTimeout(() => setSuccess(''), 3500)
