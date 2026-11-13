@@ -16,6 +16,8 @@ export default function DriverHome() {
   const [error, setError] = useState('')
   useEffect(() => { sessionStorage.setItem('cuetgo_driver_tab', tab) }, [tab])
   const [success, setSuccess] = useState('')
+  const [cancelRideTarget, setCancelRideTarget] = useState(null)
+  const [canceling, setCanceling] = useState(false)
   const [editingProfile, setEditingProfile] = useState(false)
   const [profileForm, setProfileForm] = useState({ name: user?.name || '', phone: user?.phone || '' })
   const [savingProfile, setSavingProfile] = useState(false)
@@ -134,19 +136,26 @@ export default function DriverHome() {
     }
   }
 
-  async function cancelAcceptedRide(ride) {
+  function cancelAcceptedRide(ride) {
     setError('')
     setSuccess('')
-    const confirmed = window.confirm('Cancel this accepted ride? The system will reopen it if there is still time before the 2-minute booking cutoff; otherwise passengers will see it as cancelled.')
-    if (!confirmed) return
+    setCancelRideTarget(ride)
+  }
+
+  async function confirmCancelAcceptedRide() {
+    if (!cancelRideTarget) return
+    setCanceling(true)
     try {
-      await api.driverCancelRide(ride.id)
+      await api.driverCancelRide(cancelRideTarget.id)
+      setCancelRideTarget(null)
       notify('যাত্রার অবস্থা আপডেট হয়েছে।', 'success')
       setSuccess('যাত্রার অবস্থা আপডেট হয়েছে।')
       await refresh()
     } catch (err) {
       notify(err.message, 'error')
       setError(err.message)
+    } finally {
+      setCanceling(false)
     }
   }
 
@@ -171,7 +180,7 @@ export default function DriverHome() {
             <p className="text-ink/70 text-xs uppercase tracking-[0.2em]">ড্রাইভার ড্যাশবোর্ড</p>
             <h1 className="text-2xl font-bold mt-2">{user?.name || 'ড্রাইভার'}</h1>
           </div>
-          <button onClick={() => { notify('লগ আউট হচ্ছে…', 'loading', 0); window.setTimeout(logout, 500) }} className="text-sm font-semibold text-ink/80 underline">লগ আউট</button>
+          <button type="button" onClick={logout} className="text-sm font-semibold text-ink/80 underline">লগ আউট</button>
         </div>
 
         <div className="mt-5 flex items-center justify-between rounded-2xl bg-white/30 backdrop-blur-sm border border-white/40 px-3 py-2 shadow-soft">
@@ -333,6 +342,20 @@ export default function DriverHome() {
           </section>
         )}
       </main>
+      {cancelRideTarget && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-5 backdrop-blur-sm" onClick={() => !canceling && setCancelRideTarget(null)}>
+          <section role="dialog" aria-modal="true" aria-labelledby="driver-cancel-title" className="w-full max-w-sm rounded-3xl border border-white/70 bg-white p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-2xl">⚠️</div>
+            <h2 id="driver-cancel-title" className="text-lg font-bold text-ink">যাত্রাটি বাতিল করবেন?</h2>
+            <p className="mt-2 text-sm leading-relaxed text-ink/65">আপনি কি নিশ্চিত যে এই গৃহীত যাত্রাটি বাতিল করতে চান? ২ মিনিটের বুকিং কাটঅফের আগে হলে যাত্রাটি আবার শিক্ষার্থীদের জন্য খুলে যেতে পারে।</p>
+            <div className="mt-4 rounded-2xl bg-sky-50 p-3 text-sm font-semibold text-ink">{cancelRideTarget.from} → {cancelRideTarget.to}</div>
+            <div className="mt-5 flex gap-2">
+              <button type="button" disabled={canceling} onClick={() => setCancelRideTarget(null)} className="secondary-btn flex-1 rounded-xl px-3 py-3 text-sm">ফিরে যান</button>
+              <button type="button" disabled={canceling} onClick={confirmCancelAcceptedRide} className="flex-1 rounded-xl bg-rose-600 px-3 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60">{canceling ? 'বাতিল হচ্ছে…' : 'হ্যাঁ, বাতিল করুন'}</button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   )
 }
