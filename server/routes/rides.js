@@ -47,11 +47,17 @@ function isBeforeCutoff(ride, now = Date.now()) {
   return pickupTime(ride) - now > BOOKING_CUTOFF_MS
 }
 
+function passengerSeats(passenger) {
+  const count = Number(passenger?.seatCount || 1)
+  return Number.isFinite(count) ? Math.max(1, Math.min(2, Math.floor(count))) : 1
+}
+
 function occupiedSeats(ride) {
   if (Array.isArray(ride.passengers) && ride.passengers.length) {
-    return ride.passengers.reduce((sum, passenger) => sum + Math.max(1, Number(passenger.seatCount || 1)), 0)
+    return ride.passengers.reduce((sum, passenger) => sum + passengerSeats(passenger), 0)
   }
-  return Math.max(1, Number(ride.seats || 1))
+  const count = Number(ride.seats || 1)
+  return Number.isFinite(count) ? Math.max(1, Math.min(2, Math.floor(count))) : 1
 }
 
 function normalizePassengers(ride, fallbackStudent) {
@@ -68,7 +74,7 @@ function normalizePassengers(ride, fallbackStudent) {
 
 function recalculateRide(ride) {
   const passengers = Array.isArray(ride.passengers) ? ride.passengers : []
-  const seats = passengers.reduce((sum, passenger) => sum + Math.max(1, Number(passenger.seatCount || 1)), 0)
+  const seats = passengers.reduce((sum, passenger) => sum + passengerSeats(passenger), 0)
   ride.seats = seats
   ride.passengerCount = seats
   ride.farePerSeat = farePerSeat(ride.from, ride.to)
@@ -78,6 +84,30 @@ function recalculateRide(ride) {
 function studentIsOnRide(ride, studentId) {
   return ride.studentId === studentId ||
     (Array.isArray(ride.passengers) && ride.passengers.some((passenger) => passenger.studentId === studentId))
+}
+
+function rideGroupRecords(db, ride) {
+  if (!ride.sharedGroupId) return [ride]
+  return db.rides.filter((item) =>
+    item.sharedGroupId === ride.sharedGroupId &&
+    item.driverId === ride.driverId &&
+    ['pending', 'accepted', 'arrived'].includes(item.status)
+  )
+}
+
+function totalGroupSeats(db, ride) {
+  return rideGroupRecords(db, ride).reduce((sum, item) => sum + occupiedSeats(item), 0)
+}
+
+function totalGroupRiders(db, ride) {
+  return rideGroupRecords(db, ride).reduce((sum, item) => {
+    const owner = db.students.find((student) => student.id === item.studentId)
+    return sum + normalizePassengers(item, owner).length
+  }, 0)
+}
+
+function studentIsOnRideGroup(db, ride, studentId) {
+  return rideGroupRecords(db, ride).some((item) => studentIsOnRide(item, studentId))
 }
 
 function hasStudentTimeConflict(db, studentId, requestedAt, exceptRideId = null) {
@@ -101,6 +131,7 @@ function validSharedGroup(rides) {
   if (!Array.isArray(rides) || rides.length < 1 || rides.length > 2) return false
   if (!rides.every((ride) => sameRoute(ride, rides[0]))) return false
   const times = rides.map(pickupTime)
+  if (times.some((time) => !Number.isFinite(time))) return false
   if (Math.max(...times) - Math.min(...times) > MATCH_WINDOW_MS) return false
   return rides.reduce((sum, ride) => sum + occupiedSeats(ride), 0) <= 2
 }
@@ -154,17 +185,22 @@ router.get('/routes', (req, res) => {
 router.get('/open', requireAuth('student'), async (req, res) => {
   const db = await readDbAndExpirePending()
   const now = Date.now()
+  const seenGroups = new Set()
   const rides = db.rides
-    .filter((ride) =>
-      ['pending', 'accepted', 'arrived'].includes(ride.status) &&
-      pickupTime(ride) > now + BOOKING_CUTOFF_MS &&
-      occupiedSeats(ride) < 2 &&
-      !studentIsOnRide(ride, req.user.id)
-    )
+    .filter((ride) => {
+      if (!['pending', 'accepted', 'arrived'].includes(ride.status) ||
+          pickupTime(ride) <= now + BOOKING_CUTOFF_MS ||
+          totalGroupSeats(db, ride) >= 2 ||
+          studentIsOnRideGroup(db, ride, req.user.id)) return false
+      const groupKey = ride.sharedGroupId ? `${ride.sharedGroupId}:${ride.driverId || 'unassigned'}` : ride.id
+      if (seenGroups.has(groupKey)) return false
+      seenGroups.add(groupKey)
+      return true
+    })
     .map((ride) => {
       const host = db.students.find((student) => student.id === ride.studentId)
       const passengers = normalizePassengers(ride, host)
-      const seatsUsed = occupiedSeats({ ...ride, passengers })
+      const seatsUsed = totalGroupSeats(db, ride)
       return {
         id: ride.id,
         from: ride.from,
@@ -176,7 +212,7 @@ router.get('/open', requireAuth('student'), async (req, res) => {
         hostName: host?.username || host?.name || 'Campus rider',
         seats: seatsUsed,
         seatsLeft: Math.max(0, 2 - seatsUsed),
-        riderCount: passengers.length,
+        riderCount: totalGroupRiders(db, ride),
         bookingClosesAt: new Date(pickupTime(ride) - BOOKING_CUTOFF_MS).toISOString(),
       }
     })
@@ -300,8 +336,8 @@ router.post('/:id/join', requireAuth('student'), async (req, res) => {
       throw fail(409, 'This ride has an invalid campus route and cannot accept passengers.')
     }
     if (!isBeforeCutoff(target)) throw fail(409, 'This ride is closed. Bookings close 2 minutes before pickup.')
-    if (studentIsOnRide(target, req.user.id)) throw fail(409, 'You are already part of this ride.')
-    const seatsUsed = occupiedSeats(target)
+    if (studentIsOnRideGroup(db, target, req.user.id)) throw fail(409, 'You are already part of this ride.')
+    const seatsUsed = totalGroupSeats(db, target)
     if (seatsUsed + seatCount > 2) throw fail(409, 'There are not enough empty seats left.')
 
     const student = db.students.find((item) => item.id === req.user.id)
@@ -407,7 +443,7 @@ router.get('/mine', requireAuth('student'), async (req, res) => {
     const candidates = db.rides.filter((candidate) =>
       candidate.id !== ride.id &&
       ['pending', 'accepted', 'arrived'].includes(candidate.status) &&
-      occupiedSeats(candidate) < 2 &&
+      totalGroupSeats(db, candidate) < 2 &&
       pickupTime(candidate) > Date.now() + BOOKING_CUTOFF_MS
     )
     const matches = await findMatches(ride, candidates, { useAI: false })
