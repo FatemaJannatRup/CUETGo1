@@ -17,5 +17,8 @@
     "google-auth-library": "^10.9.1",
     "pg": "^8.16.3",
     "express-async-errors": "^3.1.1"
+  },
+  "overrides": {
+    "qs": "6.16.1"
   }
 }
