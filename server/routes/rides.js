@@ -6,8 +6,9 @@ import { findMatches, optimizeSharedRoute } from '../services/gemini.js'
 
 const router = Router()
 
-function requireApprovedDriver(req, res, next) {
-  const db = readDb()
+async function requireApprovedDriver(req, res, next) {
+  try {
+  const db = await readDb()
   const driver = db.drivers.find((item) => item.id === req.user.id)
   if (!driver) return res.status(404).json({ message: 'Driver account not found.' })
   if (driver.verificationStatus === 'rejected') {
@@ -17,6 +18,7 @@ function requireApprovedDriver(req, res, next) {
     return res.status(403).json({ message: 'Your driver account is awaiting administrator approval.' })
   }
   next()
+  } catch (error) { next(error) }
 }
 
 const HALLS = [
@@ -46,8 +48,8 @@ router.get('/routes', (req, res) => {
   res.json({ locations: LOCATIONS, halls: HALLS })
 })
 
-router.get('/open', requireAuth('student'), (req, res) => {
-  const db = readDb()
+router.get('/open', requireAuth('student'), async (req, res) => {
+  const db = await readDb()
   const rides = db.rides
     .filter((ride) => ride.status === 'pending' && ride.studentId !== req.user.id)
     .map((ride) => {
@@ -124,7 +126,7 @@ router.post('/request', requireAuth('student'), async (req, res) => {
   const matches = await findMatches(ride, others)
   ride.matchedRideIds = matches.map((m) => m.rideId)
   ride.matchDetails = matches
-  writeDb(db)
+  await writeDb(db)
 
   const matchedRiders = ride.matchedRideIds
     .map((id) => db.rides.find((r) => r.id === id))
@@ -134,7 +136,7 @@ router.post('/request', requireAuth('student'), async (req, res) => {
   res.json({ ride, matches: matchedRiders })
 })
 
-router.post('/:id/join', requireAuth('student'), (req, res) => {
+router.post('/:id/join', requireAuth('student'), async (req, res) => {
   const seatCount = Number(req.body?.seats || 1)
   if (![1, 2].includes(seatCount)) return res.status(400).json({ message: 'Choose 1 or 2 seats.' })
   const db = readDb()
@@ -163,7 +165,7 @@ router.post('/:id/join', requireAuth('student'), (req, res) => {
   res.json({ ride, joined: true })
 })
 
-router.get('/mine', requireAuth('student'), (req, res) => {
+router.get('/mine', requireAuth('student'), async (req, res) => {
   const db = readDb()
   const mine = db.rides
     .filter((r) => r.studentId === req.user.id || (Array.isArray(r.passengers) && r.passengers.some((p) => p.studentId === req.user.id)))
@@ -226,7 +228,7 @@ router.post('/optimize', requireAuth('driver'), requireApprovedDriver, async (re
   res.json({ ...plan, legs: selected.map((ride) => ({ from: ride.from, to: ride.to })) })
 })
 
-router.post('/accept', requireAuth('driver'), requireApprovedDriver, (req, res) => {
+router.post('/accept', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
   const { rideIds } = req.body || {}
   if (!Array.isArray(rideIds) || rideIds.length === 0) {
     return res.status(400).json({ message: 'No ride selected.' })
@@ -265,7 +267,7 @@ router.post('/accept', requireAuth('driver'), requireApprovedDriver, (req, res) 
   res.json({ accepted: selectedRideIds.length })
 })
 
-router.post('/:id/complete', requireAuth('driver'), requireApprovedDriver, (req, res) => {
+router.post('/:id/complete', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
   const db = readDb()
   const ride = db.rides.find((item) => item.id === req.params.id && item.driverId === req.user.id)
   if (!ride) return res.status(404).json({ message: 'Ride not found.' })
@@ -277,7 +279,7 @@ router.post('/:id/complete', requireAuth('driver'), requireApprovedDriver, (req,
   res.json({ ride })
 })
 
-router.get('/mine-driver', requireAuth('driver'), requireApprovedDriver, (req, res) => {
+router.get('/mine-driver', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
   const db = readDb()
   const mine = db.rides
     .filter((r) => r.driverId === req.user.id)
