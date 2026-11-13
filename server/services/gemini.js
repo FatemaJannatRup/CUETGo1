@@ -1,4 +1,5 @@
 import fetch from 'node-fetch'
+import { LOCATIONS } from '../constants/campusLocations.js'
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent'
 
@@ -10,7 +11,8 @@ function scoreCandidate(target, candidate) {
   // A shared ride is valid only when the complete CUET journey is identical.
   // Matching one endpoint, or matching the endpoints in reverse order, is not
   // enough: it can send a student in the wrong direction.
-  if (!target.from || !target.to || target.from === target.to) return null
+  if (!LOCATIONS.includes(target.from) || !LOCATIONS.includes(target.to) || target.from === target.to) return null
+  if (!LOCATIONS.includes(candidate.from) || !LOCATIONS.includes(candidate.to)) return null
   if (candidate.from !== target.from || candidate.to !== target.to) return null
   if (!Number.isFinite(gap) || gap > 10) return null
   if (Number(target.seats || 1) !== 1 || Number(candidate.seats || 1) >= 2) return null
