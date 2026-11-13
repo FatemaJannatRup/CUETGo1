@@ -90,7 +90,6 @@ function rideGroupRecords(db, ride) {
   if (!ride.sharedGroupId) return [ride]
   return db.rides.filter((item) =>
     item.sharedGroupId === ride.sharedGroupId &&
-    item.driverId === ride.driverId &&
     ['pending', 'accepted', 'arrived'].includes(item.status)
   )
 }
@@ -201,7 +200,7 @@ router.get('/open', requireAuth('student'), async (req, res) => {
           pickupTime(ride) <= now + BOOKING_CUTOFF_MS ||
           totalGroupSeats(db, ride) >= 2 ||
           studentIsOnRideGroup(db, ride, req.user.id)) return false
-      const groupKey = ride.sharedGroupId ? `${ride.sharedGroupId}:${ride.driverId || 'unassigned'}` : ride.id
+      const groupKey = ride.sharedGroupId || ride.id
       if (seenGroups.has(groupKey)) return false
       seenGroups.add(groupKey)
       return true
