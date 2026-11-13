@@ -36,7 +36,7 @@ function scoreCandidate(target, candidate) {
  */
 export async function findMatches(target, candidates) {
   const pool = candidates
-    .filter((c) => c.id !== target.id && c.status === 'pending')
+    .filter((c) => c.id !== target.id && ['pending', 'accepted'].includes(c.status))
     .map((candidate) => scoreCandidate(target, candidate))
     .filter(Boolean)
     .sort((a, b) => b.score - a.score)
@@ -85,7 +85,7 @@ export async function optimizeSharedRoute(rides) {
   if (key) {
     const prompt = `Optimize the order of these CUET campus locations for one shared rickshaw trip. Return ONLY a JSON array of location names, using every supplied location exactly once and no other names. Prefer an order that serves shared route endpoints efficiently. Locations: ${JSON.stringify(stops)}. Ride legs (each pickup must occur before its own dropoff): ${JSON.stringify(rides.map((r) => ({ from: r.from, to: r.to })))}`
     try {
-      const res = await fetch(GEMINI_URL(key), {
+      const res = await fetch(GEMINI_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
