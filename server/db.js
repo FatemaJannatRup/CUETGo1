@@ -57,6 +57,9 @@ export async function initializeDatabase() {
     ALTER TABLE cuetgo_drivers ADD COLUMN IF NOT EXISTS email TEXT, ADD COLUMN IF NOT EXISTS name TEXT, ADD COLUMN IF NOT EXISTS phone TEXT, ADD COLUMN IF NOT EXISTS nid_last4 TEXT, ADD COLUMN IF NOT EXISTS verification_status TEXT, ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ;
     ALTER TABLE cuetgo_rides ADD COLUMN IF NOT EXISTS student_id TEXT, ADD COLUMN IF NOT EXISTS driver_id TEXT, ADD COLUMN IF NOT EXISTS from_location TEXT, ADD COLUMN IF NOT EXISTS to_location TEXT, ADD COLUMN IF NOT EXISTS fare NUMERIC(10,2), ADD COLUMN IF NOT EXISTS seats INTEGER, ADD COLUMN IF NOT EXISTS status TEXT, ADD COLUMN IF NOT EXISTS requested_time TIMESTAMPTZ, ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ;
 
+    UPDATE cuetgo_students SET email=data->>'email', username=data->>'username', student_id=data->>'studentId', hall=data->>'hall', gender=data->>'gender', created_at=NULLIF(data->>'createdAt','')::timestamptz WHERE email IS NULL;
+    UPDATE cuetgo_drivers SET email=data->>'email', name=data->>'name', phone=data->>'phone', nid_last4=data->>'nidLast4', verification_status=COALESCE(data->>'verificationStatus','pending'), created_at=NULLIF(data->>'createdAt','')::timestamptz WHERE email IS NULL;
+    UPDATE cuetgo_rides SET student_id=data->>'studentId', driver_id=data->>'driverId', from_location=data->>'from', to_location=data->>'to', fare=COALESCE(NULLIF(data->>'fare','')::numeric,0), seats=COALESCE(NULLIF(data->>'seats','')::integer,1), status=COALESCE(data->>'status','pending'), requested_time=NULLIF(data->>'requestedTime','')::timestamptz, created_at=NULLIF(data->>'createdAt','')::timestamptz WHERE student_id IS NULL;
     CREATE INDEX IF NOT EXISTS cuetgo_students_email_idx ON cuetgo_students (email);
     CREATE INDEX IF NOT EXISTS cuetgo_drivers_email_idx ON cuetgo_drivers (email);
     CREATE INDEX IF NOT EXISTS cuetgo_drivers_status_idx ON cuetgo_drivers (verification_status);
