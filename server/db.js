@@ -12,22 +12,6 @@ const pool = new Pool({
 })
 
 const TABLES = {
-  { id:'demo-student-1', username:'rup_demo', name:'Rup Demo', email:'u2204001@student.cuet.ac.bd', studentId:'2204001', hall:'Muktijoddha Hall', gender:'female', googleId:'demo-google-student-1', authProvider:'demo', demo:true, createdAt:new Date().toISOString() },
-  { id:'demo-student-2', username:'sami_demo', name:'Sami Demo', email:'u2204002@student.cuet.ac.bd', studentId:'2204002', hall:'Shaheed Tareq Huda Hall', gender:'male', googleId:'demo-google-student-2', authProvider:'demo', demo:true, createdAt:new Date().toISOString() },
-  { id:'demo-student-3', username:'nabila_demo', name:'Nabila Demo', email:'u2204003@student.cuet.ac.bd', studentId:'2204003', hall:'Sufia Kamal Hall', gender:'female', googleId:'demo-google-student-3', authProvider:'demo', demo:true, createdAt:new Date().toISOString() },
-]
-const DEMO_DRIVERS = [
-  { id:'demo-driver-1', name:'Rahim Demo', email:'driver1@example.test', phone:'01700000001', identifier:'01700000001', nidHash:'demo-nid-hash-1', nidLast4:'0001', googleId:'demo-google-driver-1', authProvider:'demo', verificationStatus:'approved', verified:true, demo:true, createdAt:new Date().toISOString(), approvedAt:new Date().toISOString() },
-  { id:'demo-driver-2', name:'Karim Demo', email:'driver2@example.test', phone:'01700000002', identifier:'01700000002', nidHash:'demo-nid-hash-2', nidLast4:'0002', googleId:'demo-google-driver-2', authProvider:'demo', verificationStatus:'pending', verified:false, demo:true, createdAt:new Date().toISOString() },
-]
-const DEMO_RIDES = [
-  { id:'demo-ride-1', studentId:'demo-student-1', from:'Muktijoddha Hall', to:'CUET Main Gate', fare:30, requestedTime:new Date(Date.now()+35*60000).toISOString(), seats:1, passengerCount:1, status:'pending', driverId:null, matchedRideIds:['demo-ride-2'], passengers:[{studentId:'demo-student-1',name:'Rup Demo',phone:'',info:'Primary rider',seatCount:1,isGuest:false}], coPassenger:null, createdAt:new Date().toISOString(), demo:true },
-  { id:'demo-ride-2', studentId:'demo-student-2', from:'Shaheed Tareq Huda Hall', to:'CUET Main Gate', fare:30, requestedTime:new Date(Date.now()+42*60000).toISOString(), seats:1, passengerCount:1, status:'pending', driverId:null, matchedRideIds:['demo-ride-1'], passengers:[{studentId:'demo-student-2',name:'Sami Demo',phone:'',info:'Primary rider',seatCount:1,isGuest:false}], coPassenger:null, createdAt:new Date().toISOString(), demo:true },
-  { id:'demo-ride-3', studentId:'demo-student-3', from:'Sufia Kamal Hall', to:'Central Library', fare:25, requestedTime:new Date(Date.now()-25*60000).toISOString(), seats:1, passengerCount:1, status:'accepted', driverId:'demo-driver-1', matchedRideIds:[], passengers:[{studentId:'demo-student-3',name:'Nabila Demo',phone:'',info:'Primary rider',seatCount:1,isGuest:false}], coPassenger:null, createdAt:new Date(Date.now()-60*60000).toISOString(), acceptedAt:new Date(Date.now()-30*60000).toISOString(), demo:true },
-  { id:'demo-ride-4', studentId:'demo-student-1', from:'Academic Building', to:'Muktijoddha Hall', fare:30, requestedTime:new Date(Date.now()-180*60000).toISOString(), seats:1, passengerCount:1, status:'completed', driverId:'demo-driver-1', matchedRideIds:[], passengers:[{studentId:'demo-student-1',name:'Rup Demo',phone:'',info:'Primary rider',seatCount:1,isGuest:false}], coPassenger:null, createdAt:new Date(Date.now()-240*60000).toISOString(), completedAt:new Date(Date.now()-180*60000).toISOString(), demo:true },
-]
-
-const TABLES = {
   students: { name:'cuetgo_students', columns:['email','username','student_id','hall','gender','created_at'], values:r=>[r.email||null,r.username||null,r.studentId||null,r.hall||null,r.gender||null,r.createdAt||null] },
   drivers: { name:'cuetgo_drivers', columns:['email','name','phone','nid_last4','verification_status','created_at'], values:r=>[r.email||null,r.name||null,r.phone||null,r.nidLast4||null,r.verificationStatus||'pending',r.createdAt||null] },
   rides: { name:'cuetgo_rides', columns:['student_id','driver_id','from_location','to_location','fare','seats','status','requested_time','created_at'], values:r=>[r.studentId||null,r.driverId||null,r.from||null,r.to||null,Number(r.fare||0),Number(r.seats||1),r.status||'pending',r.requestedTime||null,r.createdAt||null] },
