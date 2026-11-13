@@ -45,7 +45,7 @@ When a student requests a ride, CUETGo ranks pending requests using route overla
 | Authentication | Google Identity / OAuth ID-token verification, JWT |
 | Password hashing | bcryptjs (administrator password verification) |
 | Ride matching and stop-order suggestions | Google Gemini API with deterministic fallback |
-| Data storage | JSON file (`server/data/db.json`) |
+| Data storage | Supabase PostgreSQL (`pg`) with normalized columns and JSONB record payloads |
 | Deployment | Render |
 
 ## Project structure
@@ -162,7 +162,7 @@ The backend exposes these main route groups under `/api`:
 | `/auth` | Google signup/login, current-user session and profile updates |
 | `/rides` | Campus locations, ride requests, open rides, joining, driver actions and ride history |
 | `/admin` | Administrator login, dashboard data, driver review and ride management |
-| `/health` | Backend health check |
+| `/health` | Backend and PostgreSQL health check |
 
 Authenticated endpoints use a JWT in the `Authorization: Bearer <token>` header.
 
@@ -173,22 +173,38 @@ The repository includes a `render.yaml` Blueprint for a frontend static site and
 1. Push the project to GitHub.
 2. In Render, create a new Blueprint deployment and select this repository.
 3. Configure the environment variables requested by the Blueprint:
-   - Backend: `GOOGLE_CLIENT_ID`, `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH`, and optionally `GEMINI_API_KEY`.
+   - Backend: `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH`, and optionally `GEMINI_API_KEY`. `DEMO_MODE` and `SEED_DEMO_DATA` enable demo access and sample records.
    - Frontend: `VITE_GOOGLE_CLIENT_ID`. The API URL is connected to the backend service by the Blueprint.
 4. Add the deployed frontend URL to the Google OAuth client's authorized JavaScript origins.
 5. Deploy both services and check the backend `/api/health` endpoint.
 
 Keep all credentials in Render environment settings, not in source code or Git.
 
+## Database and demo data
+
+CUETGo stores application records in Supabase PostgreSQL. The backend creates these tables automatically:
+
+- `cuetgo_students` — student accounts and profile fields.
+- `cuetgo_drivers` — driver accounts, contact details and approval status.
+- `cuetgo_rides` — ride requests, routes, fares, passengers and ride status.
+
+Each table has searchable relational columns plus a `data` JSONB column for the complete application record. There is no JSON-file database and no runtime dependency on `server/data/db.json`.
+
+To inspect records, open the Supabase project → **Table Editor** → choose one of the three `cuetgo_*` tables.
+
+When `SEED_DEMO_DATA=true` (default), startup inserts a small set of clearly marked synthetic demo accounts and rides once. The seed is idempotent and does not overwrite demo changes on later restarts. The sample set includes three students, two drivers (one approved and one pending), and rides in pending, accepted and completed states.
+
+When `DEMO_MODE=true`, the student and driver login pages show demo sign-in buttons. These accounts are for exploration only. Turn demo mode off before opening the service for real users; the synthetic records can be left in the database or removed manually from the Supabase Table Editor.
+
 ## Important limitations and security notes
 
-- **Prototype storage:** the backend currently stores records in `server/data/db.json`. This is suitable for local development and demos, but it is not a production database. A Render service's local filesystem may be ephemeral, so records can be lost when the service is restarted or redeployed. Do not rely on this storage for important or permanent data.
-- **No production guarantee:** authentication and validation are implemented for the application's current scope, but the project has not been independently security-audited.
-- **Sensitive information:** driver registration collects NID information. Do not use real personal information in public demos or test environments. Keep access to the administrator account restricted.
-- **Administrator credentials:** use a strong, unique password. The administrator can access account and ride information and change driver approval status.
-- **Google configuration:** Google sign-in will not work until matching client IDs and authorized origins are configured in both frontend and backend environments.
+- **Demo access:** public demo sign-in is enabled only by the `DEMO_MODE` environment flag. Disable it for a real production launch.
+- **No production guarantee:** this project has not been independently security-audited or fully load-tested. Test Google sign-in, concurrent ride acceptance, and the full user journey before relying on it for real rides.
+- **Sensitive information:** driver registration collects NID information. Real NID values are hashed and only the last four digits are exposed to the UI. Never use real personal information in public demos or test environments.
+- **Credentials:** keep the Supabase connection string, JWT secret, Google configuration and Gemini key in Render environment settings. Do not commit them to Git.
+- **Google configuration:** Google sign-in requires matching client IDs and authorized origins in the frontend and backend environments.
 - **Gemini is optional:** without a valid `GEMINI_API_KEY`, matching uses deterministic scoring and route planning uses a safe stop-order heuristic.
-- **Route planning scope:** route optimization currently orders the campus pickup/drop-off stops for a shared trip. It does not calculate road geometry, turn-by-turn directions, live traffic or exact travel distances.
+- **Route planning scope:** route optimization orders campus pickup/drop-off stops. It does not calculate turn-by-turn directions, live traffic or exact travel distances.
 
 ## Contributing
 
