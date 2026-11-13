@@ -1,6 +1,6 @@
 import fetch from 'node-fetch'
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent'
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
 
 const minutesApart = (a, b) =>
   Math.abs(new Date(a.requestedTime || a.createdAt).getTime() - new Date(b.requestedTime || b.createdAt).getTime()) / 60000
@@ -15,10 +15,9 @@ function routeSimilarity(a, b) {
 function scoreCandidate(target, candidate) {
   const gap = minutesApart(target, candidate)
   const route = routeSimilarity(target, candidate)
-  if (!Number.isFinite(gap) || gap > 45 || route === 0) return null
-  const seats = Number(target.seats || 1) + Number(candidate.seats || 1)
-  if (seats > 2) return null
-  const timeScore = Math.max(0, 40 - gap)
+  if (!Number.isFinite(gap) || gap > 10 || route !== 100) return null
+  if (Number(target.seats || 1) !== 1 || Number(candidate.seats || 1) >= 2) return null
+  const timeScore = Math.max(0, 20 - gap * 2)
   return {
     rideId: candidate.id,
     score: Math.round(route * 0.6 + timeScore),
@@ -51,7 +50,7 @@ export async function findMatches(target, candidates) {
   const prompt = `You are assisting a campus shared-rickshaw service. Rank only the supplied feasible candidate ride IDs. Consider same/shared pickup or destination, requested time proximity, and seat capacity already checked by the system. Do not invent IDs or claim a route is feasible if it is not. Return ONLY JSON: [{"rideId":"...","reason":"short explanation"}]. Candidates: ${JSON.stringify(pool)}`
 
   try {
-    const res = await fetch(GEMINI_URL(key), {
+    const res = await fetch(GEMINI_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
