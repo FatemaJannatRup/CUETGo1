@@ -170,6 +170,8 @@ router.patch('/rides/:id/cancel', requireAuth('admin'), async (req, res) => {
   ride.status = 'cancelled'
   ride.cancelledAt = new Date().toISOString()
   ride.cancelledBy = 'admin'
+  ride.driverId = null
+  delete ride.sharedGroupId
   ride.updatedAt = ride.cancelledAt
   await writeDb(db)
   res.json({ ride: { id: ride.id, status: ride.status } })
