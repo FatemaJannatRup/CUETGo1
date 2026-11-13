@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { api } from '../api.js'
+import { useClearFeedback } from './FeedbackContext.jsx'
 
 const AuthContext = createContext(null)
 
@@ -18,6 +19,7 @@ function cachedSessionUser(token) {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const clearFeedback = useClearFeedback()
 
   useEffect(() => {
     const token = localStorage.getItem('csr_token')
@@ -69,6 +71,7 @@ export function AuthProvider({ children }) {
   }
 
   function logout() {
+    clearFeedback()
     localStorage.removeItem('csr_token')
     localStorage.removeItem('csr_user')
     setUser(null)
