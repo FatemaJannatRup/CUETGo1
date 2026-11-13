@@ -429,7 +429,7 @@ router.post('/accept', requireAuth('driver'), requireApprovedDriver, async (req,
     }
 
     const existing = db.rides.filter((ride) =>
-      ride.driverId === req.user.id && ride.status === 'accepted' &&
+      ride.driverId === req.user.id && ['accepted', 'arrived', 'in_progress'].includes(ride.status) &&
       !selectedRideIds.includes(ride.id)
     )
     const conflict = selected.some((ride) => existing.some((current) =>
