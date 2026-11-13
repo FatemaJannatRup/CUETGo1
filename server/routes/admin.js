@@ -79,8 +79,8 @@ router.get('/me', requireAuth('admin'), (req, res) => {
   res.json({ admin: { email: String(process.env.ADMIN_EMAIL || '').trim().toLowerCase(), role: 'admin' } })
 })
 
-router.get('/overview', requireAuth('admin'), (req, res) => {
-  const db = readDb()
+router.get('/overview', requireAuth('admin'), async (req, res) => {
+  const db = await readDb()
   const drivers = db.drivers || []
   const students = db.students || []
   const rides = db.rides || []
@@ -99,7 +99,7 @@ router.get('/overview', requireAuth('admin'), (req, res) => {
   })
 })
 
-router.get('/drivers', requireAuth('admin'), (req, res) => {
+router.get('/drivers', requireAuth('admin'), async (req, res) => {
   const db = readDb()
   const status = String(req.query.status || 'all')
   const drivers = (db.drivers || [])
@@ -109,7 +109,7 @@ router.get('/drivers', requireAuth('admin'), (req, res) => {
   res.json({ drivers })
 })
 
-router.patch('/drivers/:id/status', requireAuth('admin'), (req, res) => {
+router.patch('/drivers/:id/status', requireAuth('admin'), async (req, res) => {
   const status = String(req.body?.status || '')
   if (!['approved', 'rejected', 'pending'].includes(status)) {
     return res.status(400).json({ message: 'Choose approved, rejected, or pending.' })
@@ -122,11 +122,11 @@ router.patch('/drivers/:id/status', requireAuth('admin'), (req, res) => {
   driver.reviewedAt = new Date().toISOString()
   if (status === 'approved') driver.approvedAt = driver.reviewedAt
   else delete driver.approvedAt
-  writeDb(db)
+  await writeDb(db)
   res.json({ driver: safeDriver(driver) })
 })
 
-router.get('/students', requireAuth('admin'), (req, res) => {
+router.get('/students', requireAuth('admin'), async (req, res) => {
   const db = readDb()
   const students = (db.students || [])
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
@@ -134,7 +134,7 @@ router.get('/students', requireAuth('admin'), (req, res) => {
   res.json({ students })
 })
 
-router.get('/rides', requireAuth('admin'), (req, res) => {
+router.get('/rides', requireAuth('admin'), async (req, res) => {
   const db = readDb()
   const students = db.students || []
   const drivers = db.drivers || []
@@ -159,7 +159,7 @@ router.get('/rides', requireAuth('admin'), (req, res) => {
   res.json({ rides })
 })
 
-router.patch('/rides/:id/cancel', requireAuth('admin'), (req, res) => {
+router.patch('/rides/:id/cancel', requireAuth('admin'), async (req, res) => {
   const db = readDb()
   const ride = (db.rides || []).find((item) => item.id === req.params.id)
   if (!ride) return res.status(404).json({ message: 'Ride not found.' })
