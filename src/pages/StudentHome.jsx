@@ -99,6 +99,12 @@ export default function StudentHome() {
     if (!selectedDay) return
     const nextDate = new Date(selectedDay)
     nextDate.setHours(9, 0, 0, 0)
+    // For today, default to five minutes from now so a last-minute campus
+    // booking is immediately possible instead of defaulting to a past 9 AM.
+    if (nextDate.getTime() < Date.now() + 3 * 60 * 1000) {
+      nextDate.setTime(Date.now() + 5 * 60 * 1000)
+      nextDate.setSeconds(0, 0)
+    }
     setForm((prev) => ({ ...prev, requestedTime: toLocalDateTimeInput(nextDate) }))
   }, [selectedDay])
 
