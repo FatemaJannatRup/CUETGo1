@@ -336,7 +336,7 @@ router.get('/mine', requireAuth('student'), async (req, res) => {
       occupiedSeats(candidate) < 2 &&
       pickupTime(candidate) > Date.now() + BOOKING_CUTOFF_MS
     )
-    const matches = await findMatches(ride, candidates)
+    const matches = await findMatches(ride, candidates, { useAI: false })
     return { ...ride, matchDetails: matches }
   }))
   res.json({ rides: withMatches })
