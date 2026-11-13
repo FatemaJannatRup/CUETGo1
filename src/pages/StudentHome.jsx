@@ -364,7 +364,7 @@ export default function StudentHome() {
                       <div className="flex justify-between items-center">
                         <div>
                           <p className="font-bold text-ink">{ride.from} → {ride.to}</p>
-                          <p className="text-xs text-ink/60 mt-1">{ride.hostName} • {formatTime(ride.requestedTime || ride.createdAt)}</p>
+                          <p className="text-xs text-ink/60 mt-1">{ride.hostName} • {formatRideDate(ride.requestedTime || ride.createdAt)}</p>
                           <p className="mt-2 text-xs text-ink/60">Exact CUET route match · {ride.timeDifferenceMinutes === 0 ? 'Same departure time' : `${ride.timeDifferenceMinutes} min from your selected time`}</p>
                         </div>
                         <div className="flex flex-col items-end gap-2">
@@ -425,7 +425,7 @@ export default function StudentHome() {
                     <div key={ride.id} className="rounded-2xl border border-sky-100 bg-sky-50 p-3">
                       <div className="ride-card-heading">
                         <p className="ride-route-title">{ride.from} → {ride.to}</p>
-                        <span className="ride-status-pill ride-status-${ride.status}">{formatRideStatus(ride.status)}</span>
+                        <span className={`ride-status-pill ride-status-${ride.status}`}>{formatRideStatus(ride.status)}</span>
                       </div>
                       <div className="ride-request-meta">
                         <div className="ride-time-block" aria-label={`Departure ${formatRideDate(ride.requestedTime || ride.createdAt)} at ${formatRideClock(ride.requestedTime || ride.createdAt)}`}>
