@@ -321,7 +321,10 @@ router.post('/:id/cancel', requireAuth('student'), async (req, res) => {
   const result = await mutateDb((db) => {
     const ride = db.rides.find((item) => item.id === req.params.id)
     if (!ride || !['pending', 'accepted', 'arrived'].includes(ride.status)) throw fail(404, 'Active ride not found.')
-    if (!isBeforeCutoff(ride)) throw fail(409, 'Passenger changes are locked 2 minutes before pickup.')
+    if (pickupTime(ride) <= Date.now()) throw fail(409, 'The pickup time has passed. Contact your driver if you cannot travel.')
+    // Cancellations remain possible after the cutoff, but the released seat is
+    // not advertised to another student once the booking window has closed.
+    const seatReopened = isBeforeCutoff(ride)
     const passengers = normalizePassengers(ride, db.students.find((item) => item.id === ride.studentId))
     if (!passengers.some((passenger) => passenger.studentId === req.user.id)) {
       throw fail(403, 'You are not a passenger on this ride.')
@@ -345,9 +348,9 @@ router.post('/:id/cancel', requireAuth('student'), async (req, res) => {
       recalculateRide(ride)
     }
     ride.updatedAt = new Date().toISOString()
-    return { ride, cancelled: true }
+    return { ride, cancelled: true, seatReopened }
   })
-  res.json({ ride: result.ride, cancelled: true })
+  res.json({ ride: result.ride, cancelled: true, seatReopened: result.seatReopened })
 })
 
 router.get('/mine', requireAuth('student'), async (req, res) => {
