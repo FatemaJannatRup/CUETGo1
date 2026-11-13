@@ -13,15 +13,20 @@ permissions:
 jobs:
   audit-and-lockfiles:
     runs-on: ubuntu-latest
+    env:
+      BRANCH_NAME: ${{ github.event.pull_request.head.ref || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - name: Regenerate and safely patch frontend lockfile
         run: |
-          npm install --package-lock-only --ignore-scripts
+          npm install --package-lock-only --ignore-scripts --no-audit
           npm audit fix --package-lock-only --ignore-scripts || true
           npm ci --ignore-scripts
           npm run build
@@ -29,24 +34,28 @@ jobs:
       - name: Regenerate and safely patch backend lockfile
         working-directory: server
         run: |
-          npm install --package-lock-only --ignore-scripts
+          npm install --package-lock-only --ignore-scripts --no-audit
           npm audit fix --package-lock-only --ignore-scripts || true
           npm ci --ignore-scripts
+          node --check index.js
           npm audit --json > ../backend-audit.json || true
       - name: Summarize audit findings
         if: always()
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
+          let totalFindings = 0;
           for (const file of ['frontend-audit.json','backend-audit.json']) {
             if (!fs.existsSync(file)) continue;
             const report = JSON.parse(fs.readFileSync(file,'utf8'));
             const v = report.metadata?.vulnerabilities || {};
+            totalFindings += v.total || 0;
             console.log(file, JSON.stringify({info:v.info||0,low:v.low||0,moderate:v.moderate||0,high:v.high||0,critical:v.critical||0,total:v.total||0}));
             for (const [name, item] of Object.entries(report.vulnerabilities || {})) {
               console.log(name, JSON.stringify({severity:item.severity, direct:item.isDirect, range:item.range, fixAvailable:item.fixAvailable, via:item.via?.map(x=>typeof x==='string'?x:x.title)}));
             }
           }
+          if (totalFindings > 0) process.exitCode = 1;
           NODE
       - name: Upload full audit reports
         if: always()
@@ -58,6 +67,7 @@ jobs:
             backend-audit.json
           if-no-files-found: warn
       - name: Commit regenerated lockfiles
+        if: success()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -65,6 +75,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "Lockfiles already current"
           else
-            git commit -m "chore: refresh and patch npm lockfiles [skip ci]"
-            git push
+            git commit -m "chore: refresh secure npm lockfiles [skip ci]"
+            git push origin "HEAD:${BRANCH_NAME}"
           fi
