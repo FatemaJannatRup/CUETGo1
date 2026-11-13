@@ -921,3 +921,91 @@ body {
   .admin-login-page { padding: 22px 16px; }
   .admin-login-card { padding: 26px 20px; }
 }
+
+
+/* Ride cards: make departure time prominent and keep compact labels intact. */
+.ride-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+.ride-route-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  color: var(--cuet-ink);
+  font-size: clamp(15px, 4.1vw, 19px);
+  font-weight: 800;
+  line-height: 1.42;
+  letter-spacing: -.3px;
+  overflow-wrap: anywhere;
+}
+.ride-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  max-width: none;
+  white-space: nowrap;
+  word-break: keep-all;
+  padding: 7px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+.ride-status-open { background: #d8f8e8; color: #087653; }
+.ride-status-pending { background: #fff2d9; color: #946018; }
+.ride-status-accepted,.ride-status-arrived,.ride-status-in_progress { background: #e2f1fa; color: #24658a; }
+.ride-status-cancelled,.ride-status-rejected { background: #fce8e8; color: #a33c46; }
+.ride-status-expired { background: #edf0f2; color: #657780; }
+.ride-status-completed { background: #e2f5e9; color: #28734f; }
+.ride-time-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  margin-top: 12px;
+}
+.ride-time-date {
+  color: var(--cuet-muted);
+  font-size: 11px;
+  line-height: 1.35;
+  font-weight: 650;
+}
+.ride-time-clock {
+  color: var(--cuet-teal-dark);
+  font-size: clamp(19px, 5vw, 23px);
+  line-height: 1.2;
+  font-weight: 850;
+  letter-spacing: -.45px;
+  font-variant-numeric: tabular-nums;
+}
+.ride-host-name {
+  margin: 5px 0 0;
+  color: var(--cuet-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.ride-request-meta {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ride-seat-count {
+  padding-bottom: 2px;
+  color: var(--cuet-muted);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+@media (max-width: 360px) {
+  .ride-card-heading { gap: 7px; }
+  .ride-status-pill { padding: 6px 8px; font-size: 9px; }
+  .ride-route-title { font-size: 15px; }
+}
