@@ -100,7 +100,7 @@ router.get('/overview', requireAuth('admin'), async (req, res) => {
 })
 
 router.get('/drivers', requireAuth('admin'), async (req, res) => {
-  const db = readDb()
+  const db = await readDb()
   const status = String(req.query.status || 'all')
   const drivers = (db.drivers || [])
     .filter((d) => status === 'all' || (d.verificationStatus || 'pending') === status)
@@ -114,7 +114,7 @@ router.patch('/drivers/:id/status', requireAuth('admin'), async (req, res) => {
   if (!['approved', 'rejected', 'pending'].includes(status)) {
     return res.status(400).json({ message: 'Choose approved, rejected, or pending.' })
   }
-  const db = readDb()
+  const db = await readDb()
   const driver = (db.drivers || []).find((item) => item.id === req.params.id)
   if (!driver) return res.status(404).json({ message: 'Driver account not found.' })
   driver.verificationStatus = status
@@ -127,7 +127,7 @@ router.patch('/drivers/:id/status', requireAuth('admin'), async (req, res) => {
 })
 
 router.get('/students', requireAuth('admin'), async (req, res) => {
-  const db = readDb()
+  const db = await readDb()
   const students = (db.students || [])
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
     .map(safeStudent)
@@ -135,7 +135,7 @@ router.get('/students', requireAuth('admin'), async (req, res) => {
 })
 
 router.get('/rides', requireAuth('admin'), async (req, res) => {
-  const db = readDb()
+  const db = await readDb()
   const students = db.students || []
   const drivers = db.drivers || []
   const rides = (db.rides || []).map((ride) => {
@@ -160,7 +160,7 @@ router.get('/rides', requireAuth('admin'), async (req, res) => {
 })
 
 router.patch('/rides/:id/cancel', requireAuth('admin'), async (req, res) => {
-  const db = readDb()
+  const db = await readDb()
   const ride = (db.rides || []).find((item) => item.id === req.params.id)
   if (!ride) return res.status(404).json({ message: 'Ride not found.' })
   if (!['pending', 'accepted'].includes(ride.status)) {
@@ -169,7 +169,7 @@ router.patch('/rides/:id/cancel', requireAuth('admin'), async (req, res) => {
   ride.status = 'cancelled'
   ride.cancelledAt = new Date().toISOString()
   ride.cancelledBy = 'admin'
-  writeDb(db)
+  await writeDb(db)
   res.json({ ride: { id: ride.id, status: ride.status } })
 })
 
