@@ -109,6 +109,22 @@ export default function DriverHome() {
     }
   }
 
+  async function cancelAcceptedRide(ride) {
+    setError('')
+    setSuccess('')
+    const confirmed = window.confirm('Cancel this accepted ride? The system will reopen it if there is still time before the 2-minute booking cutoff; otherwise passengers will see it as cancelled.')
+    if (!confirmed) return
+    try {
+      await api.driverCancelRide(ride.id)
+      notify('যাত্রার অবস্থা আপডেট হয়েছে।', 'success')
+      setSuccess('যাত্রার অবস্থা আপডেট হয়েছে।')
+      await refresh()
+    } catch (err) {
+      notify(err.message, 'error')
+      setError(err.message)
+    }
+  }
+
   return (
     <div className="app-dashboard bn h-full min-h-full flex flex-col bg-cream text-ink">
       <header className="app-header bg-gradient-to-br from-sky-500 via-sky-400 to-sky-600 text-ink px-6 pt-10 pb-6 rounded-b-[30px] shadow-soft">
@@ -204,7 +220,10 @@ export default function DriverHome() {
                         <p className="text-xs text-ink/60 mt-2">{formatTime(ride.requestedTime || ride.createdAt)} • {ride.seats || 1} সিট</p>
                         <p className="text-xs text-ink/60 mt-1">যাত্রী: {ride.passengers?.map((item) => item.name).join(', ') || 'যাত্রী(গণ)'}</p>
                         {ride.status === 'accepted' && (
-                          <button onClick={() => complete(ride)} className="primary-btn w-full mt-3 py-3 text-xs uppercase tracking-[0.14em]">সম্পন্ন করুন</button>
+                          <div className="grid grid-cols-2 gap-2 mt-3">
+                            <button onClick={() => complete(ride)} className="primary-btn py-3 text-xs uppercase tracking-[0.14em]">সম্পন্ন করুন</button>
+                            <button onClick={() => cancelAcceptedRide(ride)} className="secondary-btn py-3 text-xs uppercase tracking-[0.10em]">বাতিল করুন</button>
+                          </div>
                         )}
                       </div>
                     ))}
