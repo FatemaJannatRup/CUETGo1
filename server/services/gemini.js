@@ -1,6 +1,6 @@
 import fetch from 'node-fetch'
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent'
 
 const minutesApart = (a, b) =>
   Math.abs(new Date(a.requestedTime || a.createdAt).getTime() - new Date(b.requestedTime || b.createdAt).getTime()) / 60000
