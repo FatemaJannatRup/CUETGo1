@@ -451,7 +451,7 @@ router.post('/accept', requireAuth('driver'), requireApprovedDriver, async (req,
 router.post('/:id/driver-cancel', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
   const ride = await mutateDb((db) => {
     const target = db.rides.find((item) =>
-      item.id === req.params.id && item.driverId === req.user.id && item.status === 'accepted'
+      item.id === req.params.id && item.driverId === req.user.id && ['accepted', 'arrived'].includes(item.status)
     )
     if (!target) throw fail(404, 'Accepted ride not found.')
     const now = Date.now()
@@ -472,10 +472,33 @@ router.post('/:id/driver-cancel', requireAuth('driver'), requireApprovedDriver, 
   res.json(ride)
 })
 
+router.post('/:id/status', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
+  const nextStatus = String(req.body?.status || '')
+  if (!['arrived', 'in_progress'].includes(nextStatus)) {
+    throw fail(400, 'Choose arrived or in_progress.')
+  }
+  const ride = await mutateDb((db) => {
+    const target = db.rides.find((item) =>
+      item.id === req.params.id && item.driverId === req.user.id
+    )
+    if (!target) throw fail(404, 'Assigned ride not found.')
+    const allowed = (nextStatus === 'arrived' && target.status === 'accepted') ||
+      (nextStatus === 'in_progress' && target.status === 'arrived')
+    if (!allowed) throw fail(409, 'The ride status has changed. Refresh and try again.')
+    const timestamp = new Date().toISOString()
+    target.status = nextStatus
+    if (nextStatus === 'arrived') target.arrivedAt = timestamp
+    if (nextStatus === 'in_progress') target.startedAt = timestamp
+    target.updatedAt = timestamp
+    return target
+  })
+  res.json({ ride })
+})
+
 router.post('/:id/complete', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
   const ride = await mutateDb((db) => {
     const target = db.rides.find((item) =>
-      item.id === req.params.id && item.driverId === req.user.id && item.status === 'accepted'
+      item.id === req.params.id && item.driverId === req.user.id && ['accepted', 'arrived', 'in_progress'].includes(item.status)
     )
     if (!target) throw fail(404, 'Accepted ride not found.')
     target.status = 'completed'
