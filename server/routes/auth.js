@@ -67,7 +67,8 @@ function issueSession(res, account, role) {
 
 router.post('/google/signup', async (req, res) => {
   try {
-    const { credential, role, profile = {} } = req.body || {}
+    const { credential, role } = req.body || {}
+    const profile = req.body?.profile && typeof req.body.profile === 'object' && !Array.isArray(req.body.profile) ? req.body.profile : {}
     if (!['student', 'driver'].includes(role)) {
       return res.status(400).json({ message: 'Choose a valid account type.' })
     }
