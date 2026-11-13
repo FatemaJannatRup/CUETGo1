@@ -95,4 +95,9 @@ export async function writeDb(data) {
   }
 }
 
+export async function checkDatabase() {
+  const result = await pool.query(`SELECT (SELECT COUNT(*) FROM cuetgo_students) AS students, (SELECT COUNT(*) FROM cuetgo_drivers) AS drivers, (SELECT COUNT(*) FROM cuetgo_rides) AS rides`)
+  return result.rows[0]
+}
+
 export async function closeDatabase() { await pool.end() }
