@@ -11,6 +11,13 @@ const MAX_ATTEMPTS = 5
 function rateLimitLogin(req, res, next) {
   const key = req.ip || req.socket.remoteAddress || 'unknown'
   const now = Date.now()
+  for (const [ip, attempt] of loginAttempts) {
+    if (now - attempt.startedAt >= WINDOW_MS) loginAttempts.delete(ip)
+  }
+  if (loginAttempts.size > 5000) {
+    const oldestKey = loginAttempts.keys().next().value
+    if (oldestKey) loginAttempts.delete(oldestKey)
+  }
   const record = loginAttempts.get(key)
   if (record && now - record.startedAt < WINDOW_MS && record.count >= MAX_ATTEMPTS) {
     return res.status(429).json({ message: 'Too many login attempts. Try again in 15 minutes.' })
