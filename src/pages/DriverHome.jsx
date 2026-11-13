@@ -125,6 +125,19 @@ export default function DriverHome() {
     }
   }
 
+  async function updateRideStatus(ride, status) {
+    setError('')
+    try {
+      await api.updateRideStatus(ride.id, status)
+      notify(status === 'arrived' ? 'আপনি পিকআপ স্থানে পৌঁছেছেন।' : 'যাত্রা শুরু হয়েছে।', 'success')
+      setSuccess(status === 'arrived' ? 'পিকআপ স্থানে পৌঁছেছেন হিসেবে চিহ্নিত হয়েছে।' : 'যাত্রা শুরু হয়েছে।')
+      await refresh()
+    } catch (err) {
+      notify(err.message, 'error')
+      setError(err.message)
+    }
+  }
+
   return (
     <div className="app-dashboard bn h-full min-h-full flex flex-col bg-cream text-ink">
       <header className="app-header bg-gradient-to-br from-sky-500 via-sky-400 to-sky-600 text-ink px-6 pt-10 pb-6 rounded-b-[30px] shadow-soft">
@@ -139,7 +152,7 @@ export default function DriverHome() {
         <div className="mt-5 flex items-center justify-between rounded-2xl bg-white/30 backdrop-blur-sm border border-white/40 px-3 py-2 shadow-soft">
           <div>
             <p className="text-[10px] uppercase tracking-[0.18em] text-ink/70">সময়সূচি</p>
-            <p className="text-xl font-bold">{user?.verificationStatus === 'approved' ? `${rides.filter((ride) => ride.status === 'accepted').length} সক্রিয় যাত্রা` : 'যাচাই অপেক্ষমাণ'}</p>
+            <p className="text-xl font-bold">{user?.verificationStatus === 'approved' ? `${rides.filter((ride) => ['accepted', 'arrived', 'in_progress'].includes(ride.status)).length} সক্রিয় যাত্রা` : 'যাচাই অপেক্ষমাণ'}</p>
           </div>
           <span className="metric-pill">🚕 সক্রিয়</span>
         </div>
@@ -221,9 +234,18 @@ export default function DriverHome() {
                         <p className="text-xs text-ink/60 mt-1">যাত্রী: {ride.passengers?.map((item) => item.name).join(', ') || 'যাত্রী(গণ)'}</p>
                         {ride.status === 'accepted' && (
                           <div className="grid grid-cols-2 gap-2 mt-3">
-                            <button onClick={() => complete(ride)} className="primary-btn py-3 text-xs uppercase tracking-[0.14em]">সম্পন্ন করুন</button>
+                            <button onClick={() => updateRideStatus(ride, 'arrived')} className="primary-btn py-3 text-xs uppercase tracking-[0.12em]">পৌঁছেছি</button>
                             <button onClick={() => cancelAcceptedRide(ride)} className="secondary-btn py-3 text-xs uppercase tracking-[0.10em]">বাতিল করুন</button>
                           </div>
+                        )}
+                        {ride.status === 'arrived' && (
+                          <div className="grid grid-cols-2 gap-2 mt-3">
+                            <button onClick={() => updateRideStatus(ride, 'in_progress')} className="primary-btn py-3 text-xs uppercase tracking-[0.12em]">যাত্রা শুরু</button>
+                            <button onClick={() => cancelAcceptedRide(ride)} className="secondary-btn py-3 text-xs uppercase tracking-[0.10em]">বাতিল করুন</button>
+                          </div>
+                        )}
+                        {ride.status === 'in_progress' && (
+                          <button onClick={() => complete(ride)} className="primary-btn w-full mt-3 py-3 text-xs uppercase tracking-[0.14em]">সম্পন্ন করুন</button>
                         )}
                       </div>
                     ))}
