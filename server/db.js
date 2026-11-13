@@ -21,32 +21,56 @@ const DEMO_DRIVERS = [
   { id:'demo-driver-2', name:'Karim Demo', email:'driver2@example.test', phone:'01700000002', identifier:'01700000002', nidHash:'demo-nid-hash-2', nidLast4:'0002', googleId:'demo-google-driver-2', authProvider:'demo', verificationStatus:'pending', verified:false, demo:true, createdAt:new Date().toISOString() },
 ]
 const DEMO_RIDES = [
-  { id:'demo-ride-1', studentId:'demo-student-1', from:'Muktijoddha Hall', to:'CUET Main Gate', fare:30, requestedTime:new Date(Date.now() + 35 * 60 * 1000).toISOString(), seats:1, passengerCount:1, status:'pending', driverId:null, matchedRideIds:['demo-ride-2'], passengers:[{studentId:'demo-student-1',name:'Rup Demo',phone:'',info:'Primary rider',seatCount:1,isGuest:false}], coPassenger:null, createdAt:new Date().toISOString(), demo:true },
-  { id:'demo-ride-2', studentId:'demo-student-2', from:'Shaheed Tareq Huda Hall', to:'CUET Main Gate', fare:30, requestedTime:new Date(Date.now() + 42 * 60 * 1000).toISOString(), seats:1, passengerCount:1, status:'pending', driverId:null, matchedRideIds:['demo-ride-1'], passengers:[{studentId:'demo-student-2',name:'Sami Demo',phone:'',info:'Primary rider',seatCount:1,isGuest:false}], coPassenger:null, createdAt:new Date().toISOString(), demo:true },
-  { id:'demo-ride-3', studentId:'demo-student-3', from:'Sufia Kamal Hall', to:'Central Library', fare:25, requestedTime:new Date(Date.now() + -25 * 60 * 1000).toISOString(), seats:1, passengerCount:1, status:'accepted', driverId:'demo-driver-1', matchedRideIds:[], passengers:[{studentId:'demo-student-3',name:'Nabila Demo',phone:'',info:'Primary rider',seatCount:1,isGuest:false}], coPassenger:null, createdAt:new Date(Date.now()-60*60*1000).toISOString(), acceptedAt:new Date(Date.now()-30*60*1000).toISOString(), demo:true },
-  { id:'demo-ride-4', studentId:'demo-student-1', from:'Academic Building', to:'Muktijoddha Hall', fare:30, requestedTime:new Date(Date.now() + -180 * 60 * 1000).toISOString(), seats:1, passengerCount:1, status:'completed', driverId:'demo-driver-1', matchedRideIds:[], passengers:[{studentId:'demo-student-1',name:'Rup Demo',phone:'',info:'Primary rider',seatCount:1,isGuest:false}], coPassenger:null, createdAt:new Date(Date.now()-4*60*60*1000).toISOString(), completedAt:new Date(Date.now()-3*60*60*1000).toISOString(), demo:true },
+  { id:'demo-ride-1', studentId:'demo-student-1', from:'Muktijoddha Hall', to:'CUET Main Gate', fare:30, requestedTime:new Date(Date.now()+35*60000).toISOString(), seats:1, passengerCount:1, status:'pending', driverId:null, matchedRideIds:['demo-ride-2'], passengers:[{studentId:'demo-student-1',name:'Rup Demo',phone:'',info:'Primary rider',seatCount:1,isGuest:false}], coPassenger:null, createdAt:new Date().toISOString(), demo:true },
+  { id:'demo-ride-2', studentId:'demo-student-2', from:'Shaheed Tareq Huda Hall', to:'CUET Main Gate', fare:30, requestedTime:new Date(Date.now()+42*60000).toISOString(), seats:1, passengerCount:1, status:'pending', driverId:null, matchedRideIds:['demo-ride-1'], passengers:[{studentId:'demo-student-2',name:'Sami Demo',phone:'',info:'Primary rider',seatCount:1,isGuest:false}], coPassenger:null, createdAt:new Date().toISOString(), demo:true },
+  { id:'demo-ride-3', studentId:'demo-student-3', from:'Sufia Kamal Hall', to:'Central Library', fare:25, requestedTime:new Date(Date.now()-25*60000).toISOString(), seats:1, passengerCount:1, status:'accepted', driverId:'demo-driver-1', matchedRideIds:[], passengers:[{studentId:'demo-student-3',name:'Nabila Demo',phone:'',info:'Primary rider',seatCount:1,isGuest:false}], coPassenger:null, createdAt:new Date(Date.now()-60*60000).toISOString(), acceptedAt:new Date(Date.now()-30*60000).toISOString(), demo:true },
+  { id:'demo-ride-4', studentId:'demo-student-1', from:'Academic Building', to:'Muktijoddha Hall', fare:30, requestedTime:new Date(Date.now()-180*60000).toISOString(), seats:1, passengerCount:1, status:'completed', driverId:'demo-driver-1', matchedRideIds:[], passengers:[{studentId:'demo-student-1',name:'Rup Demo',phone:'',info:'Primary rider',seatCount:1,isGuest:false}], coPassenger:null, createdAt:new Date(Date.now()-240*60000).toISOString(), completedAt:new Date(Date.now()-180*60000).toISOString(), demo:true },
 ]
+
+const TABLES = {
+  students: { name:'cuetgo_students', columns:['email','username','student_id','hall','gender','created_at'], values:r=>[r.email||null,r.username||null,r.studentId||null,r.hall||null,r.gender||null,r.createdAt||null] },
+  drivers: { name:'cuetgo_drivers', columns:['email','name','phone','nid_last4','verification_status','created_at'], values:r=>[r.email||null,r.name||null,r.phone||null,r.nidLast4||null,r.verificationStatus||'pending',r.createdAt||null] },
+  rides: { name:'cuetgo_rides', columns:['student_id','driver_id','from_location','to_location','fare','seats','status','requested_time','created_at'], values:r=>[r.studentId||null,r.driverId||null,r.from||null,r.to||null,Number(r.fare||0),Number(r.seats||1),r.status||'pending',r.requestedTime||null,r.createdAt||null] },
+}
+
+async function saveRecord(client, kind, record, ignoreConflict = false) {
+  const table = TABLES[kind]
+  if (!table || !record?.id) throw new Error(`Cannot save invalid ${kind} record.`)
+  const columns = ['id','data',...table.columns]
+  const values = [String(record.id),JSON.stringify(record),...table.values(record)]
+  const placeholders = values.map((_,i)=>`$${i+1}`)
+  const updates = ['data',...table.columns].map((column)=>`${column}=EXCLUDED.${column}`)
+  const conflict = ignoreConflict ? 'DO NOTHING' : `DO UPDATE SET ${updates.join(',')}, updated_at=NOW()`
+  await client.query(
+    `INSERT INTO ${table.name} (${columns.join(',')},updated_at) VALUES (${placeholders.join(',')},NOW()) ON CONFLICT (id) ${conflict}`,
+    values,
+  )
+}
 
 export async function initializeDatabase() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS cuetgo_students (id TEXT PRIMARY KEY, data JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
     CREATE TABLE IF NOT EXISTS cuetgo_drivers (id TEXT PRIMARY KEY, data JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
     CREATE TABLE IF NOT EXISTS cuetgo_rides (id TEXT PRIMARY KEY, data JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
-    CREATE INDEX IF NOT EXISTS cuetgo_students_email_idx ON cuetgo_students ((data->>'email'));
-    CREATE INDEX IF NOT EXISTS cuetgo_drivers_email_idx ON cuetgo_drivers ((data->>'email'));
-    CREATE INDEX IF NOT EXISTS cuetgo_rides_status_idx ON cuetgo_rides ((data->>'status'));
-    CREATE INDEX IF NOT EXISTS cuetgo_rides_student_idx ON cuetgo_rides ((data->>'studentId'));
-    CREATE INDEX IF NOT EXISTS cuetgo_rides_driver_idx ON cuetgo_rides ((data->>'driverId'));
+
+    ALTER TABLE cuetgo_students ADD COLUMN IF NOT EXISTS email TEXT, ADD COLUMN IF NOT EXISTS username TEXT, ADD COLUMN IF NOT EXISTS student_id TEXT, ADD COLUMN IF NOT EXISTS hall TEXT, ADD COLUMN IF NOT EXISTS gender TEXT, ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ;
+    ALTER TABLE cuetgo_drivers ADD COLUMN IF NOT EXISTS email TEXT, ADD COLUMN IF NOT EXISTS name TEXT, ADD COLUMN IF NOT EXISTS phone TEXT, ADD COLUMN IF NOT EXISTS nid_last4 TEXT, ADD COLUMN IF NOT EXISTS verification_status TEXT, ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ;
+    ALTER TABLE cuetgo_rides ADD COLUMN IF NOT EXISTS student_id TEXT, ADD COLUMN IF NOT EXISTS driver_id TEXT, ADD COLUMN IF NOT EXISTS from_location TEXT, ADD COLUMN IF NOT EXISTS to_location TEXT, ADD COLUMN IF NOT EXISTS fare NUMERIC(10,2), ADD COLUMN IF NOT EXISTS seats INTEGER, ADD COLUMN IF NOT EXISTS status TEXT, ADD COLUMN IF NOT EXISTS requested_time TIMESTAMPTZ, ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ;
+
+    CREATE INDEX IF NOT EXISTS cuetgo_students_email_idx ON cuetgo_students (email);
+    CREATE INDEX IF NOT EXISTS cuetgo_drivers_email_idx ON cuetgo_drivers (email);
+    CREATE INDEX IF NOT EXISTS cuetgo_drivers_status_idx ON cuetgo_drivers (verification_status);
+    CREATE INDEX IF NOT EXISTS cuetgo_rides_status_idx ON cuetgo_rides (status);
+    CREATE INDEX IF NOT EXISTS cuetgo_rides_student_idx ON cuetgo_rides (student_id);
+    CREATE INDEX IF NOT EXISTS cuetgo_rides_driver_idx ON cuetgo_rides (driver_id);
   `)
 
   if (String(process.env.SEED_DEMO_DATA || 'true').toLowerCase() === 'true') {
     const client = await pool.connect()
     try {
       await client.query('BEGIN')
-      for (const [table, records] of [['cuetgo_students', DEMO_STUDENTS], ['cuetgo_drivers', DEMO_DRIVERS], ['cuetgo_rides', DEMO_RIDES]]) {
-        for (const record of records) {
-          await client.query(`INSERT INTO ${table} (id,data) VALUES ($1,$2::jsonb) ON CONFLICT (id) DO NOTHING`, [record.id, JSON.stringify(record)])
-        }
+      for (const [kind, records] of [['students',DEMO_STUDENTS],['drivers',DEMO_DRIVERS],['rides',DEMO_RIDES]]) {
+        for (const record of records) await saveRecord(client,kind,record,true)
       }
       await client.query('COMMIT')
       console.log('Demo records ensured in PostgreSQL.')
@@ -58,33 +82,24 @@ export async function initializeDatabase() {
     }
   }
 
-  const counts = await pool.query(`
-    SELECT (SELECT COUNT(*) FROM cuetgo_students) AS students,
-           (SELECT COUNT(*) FROM cuetgo_drivers) AS drivers,
-           (SELECT COUNT(*) FROM cuetgo_rides) AS rides
-  `)
-  console.log('PostgreSQL ready. Record counts:', counts.rows[0])
+  console.log('PostgreSQL ready. Record counts:', await checkDatabase())
 }
 
 export async function readDb() {
-  const [students, drivers, rides] = await Promise.all([
+  const [students,drivers,rides] = await Promise.all([
     pool.query('SELECT data FROM cuetgo_students ORDER BY updated_at DESC'),
     pool.query('SELECT data FROM cuetgo_drivers ORDER BY updated_at DESC'),
     pool.query('SELECT data FROM cuetgo_rides ORDER BY updated_at DESC'),
   ])
-  return { students: students.rows.map((r) => r.data), drivers: drivers.rows.map((r) => r.data), rides: rides.rows.map((r) => r.data) }
+  return { students:students.rows.map(r=>r.data), drivers:drivers.rows.map(r=>r.data), rides:rides.rows.map(r=>r.data) }
 }
 
-// Upsert changed snapshots without deleting other users' records.
 export async function writeDb(data) {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
-    for (const [key, table] of [['students','cuetgo_students'],['drivers','cuetgo_drivers'],['rides','cuetgo_rides']]) {
-      for (const record of (Array.isArray(data[key]) ? data[key] : [])) {
-        if (!record?.id) throw new Error(`Cannot save ${key} record without an id.`)
-        await client.query(`INSERT INTO ${table} (id,data,updated_at) VALUES ($1,$2::jsonb,NOW()) ON CONFLICT (id) DO UPDATE SET data=EXCLUDED.data,updated_at=NOW()`, [String(record.id), JSON.stringify(record)])
-      }
+    for (const kind of Object.keys(TABLES)) {
+      for (const record of (Array.isArray(data[kind]) ? data[kind] : [])) await saveRecord(client,kind,record)
     }
     await client.query('COMMIT')
   } catch (error) {
