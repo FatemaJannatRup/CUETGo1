@@ -457,9 +457,9 @@ router.post('/:id/cancel', requireAuth('student'), async (req, res) => {
       recalculateRide(ride)
     }
     ride.updatedAt = new Date().toISOString()
-    return { ride, cancelled: true, seatReopened }
+    return { ride, cancelled: true, seatReopened, tripPreserved: ['accepted', 'arrived'].includes(ride.status) && Boolean(ride.driverId) }
   })
-  res.json({ ride: studentRideView(result.ride), cancelled: true, seatReopened: result.seatReopened })
+  res.json({ ride: studentRideView(result.ride), cancelled: true, seatReopened: result.seatReopened, tripPreserved: result.tripPreserved })
 })
 
 router.get('/mine', requireAuth('student'), async (req, res) => {
