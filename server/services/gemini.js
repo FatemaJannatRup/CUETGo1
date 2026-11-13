@@ -34,7 +34,7 @@ function scoreCandidate(target, candidate) {
  * Gemini may refine the explanations/ranking, but its output is validated against this
  * deterministic candidate set. The local scorer always works without an API key.
  */
-export async function findMatches(target, candidates) {
+export async function findMatches(target, candidates, options = {}) {
   const pool = candidates
     .filter((c) => c.id !== target.id && ['pending', 'accepted'].includes(c.status))
     .map((candidate) => scoreCandidate(target, candidate))
@@ -44,7 +44,7 @@ export async function findMatches(target, candidates) {
 
   if (!pool.length) return []
   const key = process.env.GEMINI_API_KEY
-  if (!key) return pool
+  if (!key || options.useAI === false) return pool
 
   const allowed = new Set(pool.map((item) => item.rideId))
   const prompt = `You are assisting a campus shared-rickshaw service. Rank only the supplied feasible candidate ride IDs. Consider same/shared pickup or destination, requested time proximity, and seat capacity already checked by the system. Do not invent IDs or claim a route is feasible if it is not. Return ONLY JSON: [{"rideId":"...","reason":"short explanation"}]. Candidates: ${JSON.stringify(pool)}`
@@ -53,6 +53,7 @@ export async function findMatches(target, candidates) {
     const res = await fetch(GEMINI_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+      signal: AbortSignal.timeout(5000),
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
     })
     if (!res.ok) throw new Error(`Gemini returned HTTP ${res.status}`)
