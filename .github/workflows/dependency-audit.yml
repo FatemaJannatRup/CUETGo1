@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: cuetgo-dependency-audit-${{ github.ref }}
+  group: cuetgo-dependency-audit-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -80,5 +80,7 @@ jobs:
             echo "Lockfiles already current"
           else
             git commit -m "chore: refresh npm lockfiles after security remediation [skip ci]"
+            git fetch origin "${BRANCH_NAME}"
+            git rebase "origin/${BRANCH_NAME}"
             git push origin "HEAD:${BRANCH_NAME}"
           fi
