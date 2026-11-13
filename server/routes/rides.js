@@ -144,10 +144,18 @@ function studentName(db, studentId) {
 
 // Student-facing ride payloads deliberately omit passenger phone numbers.
 function studentRideView(ride) {
-  const { passengers = [], ...safeRide } = ride
+  const safeRide = {}
+  for (const field of [
+    'id', 'from', 'to', 'fare', 'farePerSeat', 'seats', 'passengerCount',
+    'status', 'requestedTime', 'createdAt', 'updatedAt', 'driverCancelledAt',
+    'bookingClosesAt', 'matchDetails',
+  ]) {
+    if (ride[field] !== undefined) safeRide[field] = ride[field]
+  }
+  const passengers = Array.isArray(ride.passengers) ? ride.passengers : []
   return {
     ...safeRide,
-    passengers: passengers.map(({ phone, nid, nidHash, ...passenger }) => passenger),
+    passengers: passengers.map(({ phone, nid, nidHash, studentId, ...passenger }) => passenger),
   }
 }
 
