@@ -179,6 +179,11 @@ router.post('/request', requireAuth('student'), async (req, res) => {
   }
 
   const ride = await mutateDb((db) => {
+    // Recheck after acquiring the transaction lock: a request can wait in the
+    // queue long enough to cross the two-minute cutoff.
+    if (requestedAt - Date.now() <= BOOKING_CUTOFF_MS) {
+      throw fail(409, 'Bookings close 2 minutes before pickup. Choose a later time.')
+    }
     const student = db.students.find((item) => item.id === req.user.id)
     if (!student) throw fail(404, 'Student account not found.')
     if (hasStudentTimeConflict(db, req.user.id, requestedAt)) {
