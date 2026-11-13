@@ -4,6 +4,7 @@ import cors from 'cors'
 import authRoutes from './routes/auth.js'
 import rideRoutes from './routes/rides.js'
 import adminRoutes from './routes/admin.js'
+import { initializeDatabase, closeDatabase } from './db.js'
 
 const app = express()
 app.set('trust proxy', 1)
@@ -29,7 +30,8 @@ app.get('/api/health', (req, res) => res.json({ ok: true }))
 
 const PORT = Number(process.env.PORT || 5000)
 
-function startServer(port) {
+async function startServer(port) {
+  await initializeDatabase()
   const server = app.listen(port, () => {
     console.log(`CUET Shared Ride backend running on http://localhost:${port}`)
     if (!process.env.GEMINI_API_KEY) {
@@ -41,7 +43,7 @@ function startServer(port) {
     if (error.code === 'EADDRINUSE') {
       const fallbackPort = port + 1
       console.warn(`Port ${port} is busy. Retrying on ${fallbackPort}.`)
-      startServer(fallbackPort)
+      startServer(fallbackPort).catch((startupError) => { console.error('Database/server startup failed:', startupError); process.exit(1) })
       return
     }
 
@@ -50,4 +52,7 @@ function startServer(port) {
   })
 }
 
-startServer(PORT)
+startServer(PORT).catch((error) => {
+  console.error('Database initialization failed:', error)
+  closeDatabase().finally(() => process.exit(1))
+})
