@@ -36,7 +36,7 @@ function scoreCandidate(target, candidate) {
  */
 export async function findMatches(target, candidates, options = {}) {
   const pool = candidates
-    .filter((c) => c.id !== target.id && ['pending', 'accepted'].includes(c.status))
+    .filter((c) => c.id !== target.id && ['pending', 'accepted', 'arrived'].includes(c.status))
     .map((candidate) => scoreCandidate(target, candidate))
     .filter(Boolean)
     .sort((a, b) => b.score - a.score)
