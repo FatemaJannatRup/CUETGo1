@@ -139,7 +139,7 @@ router.get('/open', requireAuth('student'), async (req, res) => {
   const now = Date.now()
   const rides = db.rides
     .filter((ride) =>
-      ['pending', 'accepted'].includes(ride.status) &&
+      ['pending', 'accepted', 'arrived'].includes(ride.status) &&
       pickupTime(ride) > now + BOOKING_CUTOFF_MS &&
       occupiedSeats(ride) < 2 &&
       !studentIsOnRide(ride, req.user.id)
@@ -230,7 +230,7 @@ router.post('/request', requireAuth('student'), async (req, res) => {
   const db = await readDb()
   const candidates = db.rides.filter((candidate) =>
     candidate.id !== ride.id &&
-    ['pending', 'accepted'].includes(candidate.status) &&
+    ['pending', 'accepted', 'arrived'].includes(candidate.status) &&
     occupiedSeats(candidate) < 2 &&
     pickupTime(candidate) > Date.now() + BOOKING_CUTOFF_MS
   )
@@ -255,7 +255,7 @@ router.post('/:id/join', requireAuth('student'), async (req, res) => {
 
   const ride = await mutateDb((db) => {
     const target = db.rides.find((item) => item.id === req.params.id)
-    if (!target || !['pending', 'accepted'].includes(target.status)) {
+    if (!target || !['pending', 'accepted', 'arrived'].includes(target.status)) {
       throw fail(404, 'This shared ride is no longer available.')
     }
     if (!isBeforeCutoff(target)) throw fail(409, 'This ride is closed. Bookings close 2 minutes before pickup.')
@@ -310,7 +310,7 @@ router.post('/:id/join', requireAuth('student'), async (req, res) => {
 router.post('/:id/cancel', requireAuth('student'), async (req, res) => {
   const result = await mutateDb((db) => {
     const ride = db.rides.find((item) => item.id === req.params.id)
-    if (!ride || !['pending', 'accepted'].includes(ride.status)) throw fail(404, 'Active ride not found.')
+    if (!ride || !['pending', 'accepted', 'arrived'].includes(ride.status)) throw fail(404, 'Active ride not found.')
     if (!isBeforeCutoff(ride)) throw fail(409, 'Passenger changes are locked 2 minutes before pickup.')
     const passengers = normalizePassengers(ride, db.students.find((item) => item.id === ride.studentId))
     if (!passengers.some((passenger) => passenger.studentId === req.user.id)) {
@@ -347,10 +347,10 @@ router.get('/mine', requireAuth('student'), async (req, res) => {
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 
   const withMatches = await Promise.all(mine.map(async (ride) => {
-    if (!['pending', 'accepted'].includes(ride.status) || !isBeforeCutoff(ride)) return ride
+    if (!['pending', 'accepted', 'arrived'].includes(ride.status) || !isBeforeCutoff(ride)) return ride
     const candidates = db.rides.filter((candidate) =>
       candidate.id !== ride.id &&
-      ['pending', 'accepted'].includes(candidate.status) &&
+      ['pending', 'accepted', 'arrived'].includes(candidate.status) &&
       occupiedSeats(candidate) < 2 &&
       pickupTime(candidate) > Date.now() + BOOKING_CUTOFF_MS
     )
