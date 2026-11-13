@@ -78,20 +78,35 @@ export default function StudentHome() {
   }, [])
 
   const recommendedRides = useMemo(() => {
-    const matchDetails = new Map()
-    rides.forEach((request) => {
-      ;(request.matchDetails || []).forEach((match) => matchDetails.set(match.rideId, match))
-    })
+    // Recommendations are strict whole-journey matches, not independent
+    // pickup/destination matches. Only CUET location IDs from the server list
+    // can be selected, and both endpoints must match in the same direction.
+    if (!form.from || !form.to || form.from === form.to || !locations.includes(form.from) || !locations.includes(form.to)) return []
+
+    const requestedAt = Date.parse(form.requestedTime)
+    if (!Number.isFinite(requestedAt)) return []
+    const requestedSeats = Math.max(1, Math.min(2, Number(form.seats) || 1))
+    const timeWindowMs = 10 * 60 * 1000
+
     return openRides
+      .filter((ride) => {
+        if (ride.from !== form.from || ride.to !== form.to) return false
+        if (!locations.includes(ride.from) || !locations.includes(ride.to)) return false
+        if (!['pending', 'accepted', 'arrived'].includes(ride.status)) return false
+        const rideTime = Date.parse(ride.requestedTime || ride.createdAt)
+        if (!Number.isFinite(rideTime) || Math.abs(rideTime - requestedAt) > timeWindowMs) return false
+        const seatsLeft = Number.isFinite(Number(ride.seatsLeft))
+          ? Number(ride.seatsLeft)
+          : Math.max(0, 2 - Number(ride.seats || 1))
+        return seatsLeft >= requestedSeats
+      })
       .map((ride) => ({
         ...ride,
-        aiMatch: matchDetails.get(ride.id) || null,
-        relevance: matchDetails.has(ride.id) ? 100 : (ride.from === form.from ? 30 : 0) + (ride.to === form.to ? 30 : 0) + (ride.from === user?.hall || ride.to === user?.hall ? 10 : 0),
+        timeDifferenceMinutes: Math.round(Math.abs(Date.parse(ride.requestedTime || ride.createdAt) - requestedAt) / 60000),
       }))
-      .filter((ride) => ride.aiMatch || ride.relevance > 0)
-      .sort((a, b) => b.relevance - a.relevance)
+      .sort((a, b) => a.timeDifferenceMinutes - b.timeDifferenceMinutes)
       .slice(0, 3)
-  }, [openRides, rides, user?.hall, form.from, form.to])
+  }, [openRides, locations, form.from, form.to, form.requestedTime, form.seats])
 
   const pendingRides = rides.filter((ride) => ride.status === 'pending')
   const acceptedRides = rides.filter((ride) => ['accepted', 'arrived', 'in_progress'].includes(ride.status))
@@ -149,7 +164,7 @@ export default function StudentHome() {
     setError('')
     setSuccess('')
     try {
-      const payload = { seats: 1, phone: user?.phone || '', info: 'Joining this ride' }
+      const payload = { seats: Math.max(1, Math.min(2, Number(form.seats) || 1)), phone: user?.phone || '', info: 'Joining this ride' }
       await api.joinRide(ride.id, payload)
       notify('You joined the ride successfully.', 'success')
       setSuccess('You joined the ride successfully.')
@@ -326,7 +341,7 @@ export default function StudentHome() {
               </div>
 
               {recommendedRides.length === 0 ? (
-                <p className="text-sm text-ink/60">No matching rides yet. Try another route or time.</p>
+                <p className="text-sm text-ink/60">{!form.from || !form.to || form.from === form.to ? 'Choose two different CUET locations to see matching rides.' : 'No exact CUET route matches near your selected departure time with enough available seats.'}</p>
               ) : (
                 <div className="space-y-3">
                   {recommendedRides.map((ride) => (
@@ -335,7 +350,7 @@ export default function StudentHome() {
                         <div>
                           <p className="font-bold text-ink">{ride.from} → {ride.to}</p>
                           <p className="text-xs text-ink/60 mt-1">{ride.hostName} • {formatTime(ride.requestedTime || ride.createdAt)}</p>
-                          {ride.aiMatch && <p className="mt-2 text-xs font-semibold text-violet-700">✨ AI match · {ride.aiMatch.reason}</p>}
+                          <p className="mt-2 text-xs text-ink/60">Exact CUET route match · {ride.timeDifferenceMinutes === 0 ? 'Same departure time' : `${ride.timeDifferenceMinutes} min from your selected time`}</p>
                         </div>
                         <div className="flex flex-col items-end gap-2">
                           <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold uppercase text-emerald-700">{ride.seatsLeft ?? Math.max(0, 2 - Number(ride.seats || 1))} left</span>
