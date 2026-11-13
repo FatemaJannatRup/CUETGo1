@@ -189,6 +189,7 @@ router.post('/request', requireAuth('student'), async (req, res) => {
         isGuest: false,
       }],
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     }
 
     if (seatCount === 2) {
