@@ -490,6 +490,9 @@ router.post('/:id/status', requireAuth('driver'), requireApprovedDriver, async (
     const allowed = (nextStatus === 'arrived' && target.status === 'accepted') ||
       (nextStatus === 'in_progress' && target.status === 'arrived')
     if (!allowed) throw fail(409, 'The ride status has changed. Refresh and try again.')
+    if (nextStatus === 'in_progress' && pickupTime(target) - Date.now() > BOOKING_CUTOFF_MS) {
+      throw fail(409, 'The trip can start only after the two-minute booking window has closed.')
+    }
     const timestamp = new Date().toISOString()
     target.status = nextStatus
     if (nextStatus === 'arrived') target.arrivedAt = timestamp
