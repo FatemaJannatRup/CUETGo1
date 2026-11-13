@@ -60,21 +60,6 @@ function issueSession(res, account, role) {
   return res.json({ token, user: role === 'student' ? publicStudent(account) : publicDriver(account) })
 }
 
-router.post('/demo-login', async (req, res) => {
-  if (String(process.env.DEMO_MODE).toLowerCase() !== 'true') {
-    return res.status(404).json({ message: 'Demo access is disabled.' })
-  }
-  const { role } = req.body || {}
-  const demoIds = { student: 'demo-student-1', driver: 'demo-driver-1' }
-  if (!Object.hasOwn(demoIds, role)) return res.status(400).json({ message: 'Choose a valid demo role.' })
-  const db = await readDb()
-  const account = role === 'student'
-    ? db.students.find((item) => item.id === demoIds.student && item.demo === true)
-    : db.drivers.find((item) => item.id === demoIds.driver && item.demo === true)
-  if (!account) return res.status(503).json({ message: 'Demo account is not seeded yet. Please retry shortly.' })
-  return issueSession(res, account, role)
-})
-
 router.post('/google/signup', async (req, res) => {
   try {
     const { credential, role, profile = {} } = req.body || {}
