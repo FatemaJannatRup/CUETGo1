@@ -24,7 +24,7 @@ async function saveRecord(client, kind, record, ignoreConflict = false) {
   const values = [String(record.id),JSON.stringify(record),...table.values(record)]
   const placeholders = values.map((_,i)=>`$${i+1}`)
   const updates = ['data',...table.columns].map((column)=>`${column}=EXCLUDED.${column}`)
-  const conflict = ignoreConflict ? 'DO NOTHING' : `DO UPDATE SET ${updates.join(',')}, updated_at=NOW()`
+  const conflict = ignoreConflict ? 'DO NOTHING' : `DO UPDATE SET ${updates.join(',')}, updated_at=NOW() WHERE EXCLUDED.data ? 'updatedAt' AND COALESCE(NULLIF(${table.name}.data->>'updatedAt','')::timestamptz, 'epoch'::timestamptz) <= NULLIF(EXCLUDED.data->>'updatedAt','')::timestamptz`
   await client.query(
     `INSERT INTO ${table.name} (${columns.join(',')},updated_at) VALUES (${placeholders.join(',')},NOW()) ON CONFLICT (id) ${conflict}`,
     values,
