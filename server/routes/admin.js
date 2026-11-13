@@ -122,6 +122,7 @@ router.patch('/drivers/:id/status', requireAuth('admin'), async (req, res) => {
   driver.reviewedAt = new Date().toISOString()
   if (status === 'approved') driver.approvedAt = driver.reviewedAt
   else delete driver.approvedAt
+  driver.updatedAt = driver.reviewedAt
   await writeDb(db)
   res.json({ driver: safeDriver(driver) })
 })
@@ -169,6 +170,7 @@ router.patch('/rides/:id/cancel', requireAuth('admin'), async (req, res) => {
   ride.status = 'cancelled'
   ride.cancelledAt = new Date().toISOString()
   ride.cancelledBy = 'admin'
+  ride.updatedAt = ride.cancelledAt
   await writeDb(db)
   res.json({ ride: { id: ride.id, status: ride.status } })
 })
