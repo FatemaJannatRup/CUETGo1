@@ -10,6 +10,7 @@ const BOOKING_CUTOFF_MS = 2 * 60 * 1000
 const MATCH_WINDOW_MS = 10 * 60 * 1000
 const STUDENT_CONFLICT_WINDOW_MS = 15 * 60 * 1000
 const DRIVER_BUFFER_MS = 15 * 60 * 1000
+const GUEST_PHONE = /^(01[3-9]\d{8}|\+?8801[3-9]\d{8})$/
 
 async function requireApprovedDriver(req, res, next) {
   try {
@@ -195,8 +196,13 @@ router.post('/request', requireAuth('student'), async (req, res) => {
   }
   const seatCount = Number(seats)
   if (![1, 2].includes(seatCount)) return res.status(400).json({ message: 'A rickshaw has only 1 or 2 seats.' })
-  if (seatCount === 2 && (!String(coPassengerName).trim() || !String(coPassengerPhone).trim())) {
-    return res.status(400).json({ message: 'For 2 seats, add the companion name and phone number.' })
+  if (seatCount === 2) {
+    const guestName = String(coPassengerName).trim()
+    const guestPhone = String(coPassengerPhone).trim()
+    const guestInfo = String(coPassengerInfo || '').trim()
+    if (guestName.length < 2 || guestName.length > 80 || !GUEST_PHONE.test(guestPhone) || guestInfo.length > 120) {
+      return res.status(400).json({ message: 'Enter a valid companion name and Bangladeshi mobile number. Additional information must be 120 characters or fewer.' })
+    }
   }
 
   const ride = await mutateDb((db) => {
@@ -281,14 +287,17 @@ router.post('/:id/join', requireAuth('student'), async (req, res) => {
   const coPassengerPhone = String(req.body?.coPassengerPhone || '').trim()
   const coPassengerInfo = String(req.body?.coPassengerInfo || '').trim()
   if (![1, 2].includes(seatCount)) return res.status(400).json({ message: 'Choose 1 or 2 seats.' })
-  if (seatCount === 2 && (!coPassengerName || !coPassengerPhone)) {
-    return res.status(400).json({ message: 'For 2 seats, add the companion name and phone number.' })
+  if (seatCount === 2 && (coPassengerName.length < 2 || coPassengerName.length > 80 || !GUEST_PHONE.test(coPassengerPhone) || coPassengerInfo.length > 120)) {
+    return res.status(400).json({ message: 'Enter a valid companion name and Bangladeshi mobile number. Additional information must be 120 characters or fewer.' })
   }
 
   const ride = await mutateDb((db) => {
     const target = db.rides.find((item) => item.id === req.params.id)
     if (!target || !['pending', 'accepted', 'arrived'].includes(target.status)) {
       throw fail(404, 'This shared ride is no longer available.')
+    }
+    if (!LOCATIONS.includes(target.from) || !LOCATIONS.includes(target.to) || target.from === target.to) {
+      throw fail(409, 'This ride has an invalid campus route and cannot accept passengers.')
     }
     if (!isBeforeCutoff(target)) throw fail(409, 'This ride is closed. Bookings close 2 minutes before pickup.')
     if (studentIsOnRide(target, req.user.id)) throw fail(409, 'You are already part of this ride.')
@@ -519,6 +528,8 @@ router.post('/:id/driver-cancel', requireAuth('driver'), requireApprovedDriver, 
       ride.updatedAt = cancelledAt
       if (pickupTime(ride) <= now) {
         ride.status = 'cancelled'
+        ride.driverId = null
+        delete ride.sharedGroupId
       } else {
         // Preserve the passenger group after cutoff, but return the trip to the
         // driver queue so another approved driver can take it before pickup.
