@@ -102,7 +102,7 @@ function totalGroupSeats(db, ride) {
 function totalGroupRiders(db, ride) {
   return rideGroupRecords(db, ride).reduce((sum, item) => {
     const owner = db.students.find((student) => student.id === item.studentId)
-    return sum + normalizePassengers(item, owner).length
+    return sum + normalizePassengers(item, owner).reduce((count, passenger) => count + passengerSeats(passenger), 0)
   }, 0)
 }
 
@@ -424,6 +424,7 @@ router.post('/:id/cancel', requireAuth('student'), async (req, res) => {
       ride.cancelledAt = new Date().toISOString()
       ride.cancelledBy = 'student'
       ride.driverId = null
+      delete ride.sharedGroupId
     } else {
       recalculateRide(ride)
     }
