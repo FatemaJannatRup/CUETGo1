@@ -188,17 +188,19 @@ export default function DriverHome() {
         {error && <div className="mb-4 rounded-2xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{error}</div>}
         {success && <div className="mb-4 rounded-2xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-sm text-emerald-700">{success}</div>}
 
-        <div className="app-tabs flex gap-2 mb-5">
+        <nav className="app-tabs flex gap-2 mb-5" aria-label="Driver dashboard sections">
           {['requests', 'active', 'profile'].map((value) => (
             <button
               key={value}
+              type="button"
+              aria-pressed={tab === value}
               onClick={() => setTab(value)}
               className={`flex-1 rounded-full px-3 py-2 text-xs font-bold uppercase tracking-[0.12em] ${tab === value ? 'bg-sky-500 text-white shadow-soft' : 'bg-white text-ink/70 border border-sky-100'}`}
             >
               {value === 'requests' ? 'অনুরোধ' : value === 'active' ? 'রুটিন' : 'প্রোফাইল'}
             </button>
           ))}
-        </div>
+        </nav>
 
         {tab === 'requests' && (
           <section className="space-y-4">
