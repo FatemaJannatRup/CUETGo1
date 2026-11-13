@@ -149,7 +149,7 @@ router.post('/google/login', async (req, res) => {
       return res.status(403).json({ message: 'Drivers must use a verified personal Gmail account.' })
     }
 
-    const db = readDb()
+    const db = await readDb()
     const account = role === 'student'
       ? db.students.find((s) => s.googleId === google.googleId)
       : db.drivers.find((d) => d.googleId === google.googleId)
@@ -172,7 +172,7 @@ router.post('/google/login', async (req, res) => {
 })
 
 router.get('/me', requireAuth(), async (req, res) => {
-  const db = readDb()
+  const db = await readDb()
   if (req.user.role === 'student') {
     const student = db.students.find((s) => s.id === req.user.id)
     if (!student) return res.status(404).json({ message: 'Account not found.' })
@@ -187,7 +187,7 @@ router.get('/me', requireAuth(), async (req, res) => {
 })
 
 router.put('/profile', requireAuth(), async (req, res) => {
-  const db = readDb()
+  const db = await readDb()
   if (req.user.role === 'student') {
     const student = db.students.find((s) => s.id === req.user.id)
     if (!student) return res.status(404).json({ message: 'Account not found.' })
@@ -217,7 +217,7 @@ router.put('/profile', requireAuth(), async (req, res) => {
     student.name = username
     student.hall = hall
     student.gender = gender
-    writeDb(db)
+    await writeDb(db)
     return res.json({ user: publicStudent(student) })
   }
 
@@ -240,7 +240,7 @@ router.put('/profile', requireAuth(), async (req, res) => {
     driver.name = name
     driver.phone = phone
     driver.identifier = phone
-    writeDb(db)
+    await writeDb(db)
     return res.json({ user: publicDriver(driver) })
   }
 
