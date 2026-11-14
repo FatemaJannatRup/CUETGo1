@@ -573,7 +573,7 @@ router.post('/:id/cancel', requireAuth('student'), async (req, res) => {
 
     const registeredRemaining = ride.passengers.filter((passenger) => !passenger.isGuest)
     if (!registeredRemaining.length) {
-      if (ride.sharingMode !== 'share' || ride.status === 'pending' || !ride.driverId) {
+      if (ride.sharingMode !== 'share' || ride.status === 'pending' || !ride.driverId || !seatReopened) {
         ride.status = 'cancelled'
         ride.cancelledAt = new Date().toISOString()
         ride.cancelledBy = isCreator ? 'creator' : 'last-passenger'
