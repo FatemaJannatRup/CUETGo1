@@ -6,6 +6,7 @@ import StudentSignup from './pages/StudentSignup.jsx'
 import DriverLogin from './pages/DriverLogin.jsx'
 import DriverSignup from './pages/DriverSignup.jsx'
 import StudentHome from './pages/StudentHome.jsx'
+import StudentProfileSetup from './pages/StudentProfileSetup.jsx'
 import DriverHome from './pages/DriverHome.jsx'
 import Admin from './pages/Admin.jsx'
 import { useAuth } from './context/AuthContext.jsx'
@@ -14,6 +15,7 @@ function Protected({ role, children }) {
   const { user, loading } = useAuth()
   if (loading) return <div className="auth-loading">Restoring your CUETGo session…</div>
   if (!user || user.role !== role) return <Navigate to="/" replace />
+  if (role === 'student' && !user.gender && window.location.pathname !== '/student/setup') return <Navigate to="/student/setup" replace />
   return children
 }
 function GuestOnly({ children }) {
@@ -34,6 +36,7 @@ export default function App() {
       <Route path="/student/signup" element={<GuestOnly><StudentSignup /></GuestOnly>} />
       <Route path="/driver/login" element={<GuestOnly><DriverLogin /></GuestOnly>} />
       <Route path="/driver/signup" element={<GuestOnly><DriverSignup /></GuestOnly>} />
+      <Route path="/student/setup" element={<Protected role="student"><StudentProfileSetup /></Protected>} />
       <Route path="/student/home" element={<Protected role="student"><StudentHome /></Protected>} />
       <Route path="/driver/home" element={<Protected role="driver"><DriverHome /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
