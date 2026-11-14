@@ -79,7 +79,7 @@ export default function StudentHome() {
     try {
       const [{ rides: myRides }, { rides: availableRides }, { locations: nextLocations }] = await Promise.all([
         api.myRides(),
-        api.openRides(),
+        api.openRides(form.sharingMode === 'share' ? form.genderPreference : 'any'),
         api.routes(),
       ])
       setRides(myRides || [])
@@ -94,7 +94,7 @@ export default function StudentHome() {
     refreshData()
     const timer = setInterval(refreshData, 6000)
     return () => clearInterval(timer)
-  }, [])
+  }, [form.sharingMode, form.genderPreference])
 
   const recommendedRides = useMemo(() => {
     // Recommendations are strict whole-journey matches, not independent
@@ -112,7 +112,7 @@ export default function StudentHome() {
         if (ride.sharingMode !== 'share') return false
         if (ride.from !== form.from || ride.to !== form.to) return false
         if (!locations.includes(ride.from) || !locations.includes(ride.to)) return false
-        if (!genderAllows(ride.genderPreference, user?.gender) || !genderAllows(form.genderPreference, ride.hostGender)) return false
+        if (!genderAllows(ride.genderPreference, user?.gender)) return false
         if (!['pending', 'accepted', 'arrived'].includes(ride.status)) return false
         const rideTime = Date.parse(ride.requestedTime || ride.createdAt)
         if (!Number.isFinite(rideTime) || Math.abs(rideTime - requestedAt) > timeWindowMs) return false
@@ -427,7 +427,7 @@ export default function StudentHome() {
               </div>
 
               {recommendedRides.length === 0 ? (
-                <p className="text-sm text-ink/60">{!form.from || !form.to || form.from === form.to ? 'Choose two different CUET locations to see matching rides.' : 'No exact CUET route matches near your selected departure time with enough available seats.'}</p>
+                <p className="text-sm text-ink/60">{form.sharingMode !== 'share' ? 'Choose “Open to sharing” to see compatible shared rides.' : !form.from || !form.to || form.from === form.to ? 'Choose two different CUET locations to see matching rides.' : 'No exact CUET route, time and gender-preference matches have an available seat.'}</p>
               ) : (
                 <div className="space-y-3">
                   {recommendedRides.map((ride) => (
