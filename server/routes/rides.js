@@ -362,6 +362,10 @@ router.post('/request', requireAuth('student'), async (req, res) => {
   if (!['private', 'share'].includes(sharingMode)) return res.status(400).json({ message: 'Choose private or open-to-share.' })
   if (!['any', 'male', 'female'].includes(genderPreference)) return res.status(400).json({ message: 'Choose a valid gender preference.' })
   if (sharingMode === 'share' && seatCount !== 1) return res.status(400).json({ message: 'Open-to-share bookings reserve one seat only. Choose private for two seats.' })
+  if (sharingMode === 'share') {
+    const student = (await readDb()).students.find((item) => item.id === req.user.id)
+    if (!['male', 'female', 'unknown'].includes(student?.gender)) return res.status(403).json({ message: 'Complete your gender in your student profile before sharing a ride.' })
+  }
   if (seatCount === 2) {
     const guestName = String(coPassengerName).trim()
     const guestPhone = String(coPassengerPhone).trim()
@@ -479,6 +483,7 @@ router.post('/:id/join', requireAuth('student'), async (req, res) => {
 
     const student = db.students.find((item) => item.id === req.user.id)
     if (!student) throw fail(404, 'Student account not found.')
+    if (!['male', 'female', 'unknown'].includes(student.gender)) throw fail(403, 'Complete your gender in your student profile before joining a shared ride.')
     if (!canJoinRide(db, target, student) || !genderAllows(joinerPreference, activeRider(db, target)?.gender)) {
       throw fail(403, 'Your gender preferences are not mutually compatible with this ride.')
     }
