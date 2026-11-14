@@ -208,7 +208,8 @@ function studentRideView(ride, viewerId) {
     ...safeRide,
     myFare: mine ? Number(mine.fareShare ?? fallbackFare) : 0,
     isCreator,
-    canEdit: isCreator && ride.status === 'pending' && !ride.sharedGroupId && isBeforeCutoff(ride),
+    canEdit: isCreator && ride.status === 'pending' && !ride.sharedGroupId &&
+      registered.length === 1 && isBeforeCutoff(ride),
     passengers: passengers.map(({ phone, nid, nidHash, studentId, ...passenger }) => passenger),
   }
 }
@@ -434,6 +435,7 @@ router.post('/:id/join', requireAuth('student'), async (req, res) => {
       ownRequest.cancelledAt = new Date().toISOString()
       ownRequest.cancelledBy = 'student-pooled'
       ownRequest.updatedAt = ownRequest.cancelledAt
+      recalculateSharedGroupFares(db, ownRequest)
     }
 
     if (hasStudentTimeConflict(db, req.user.id, pickupTime(target))) {
@@ -452,7 +454,7 @@ router.post('/:id/join', requireAuth('student'), async (req, res) => {
       joinedAt,
       fareShare: 0,
     })
-    recalculateRide(target)
+    recalculateSharedGroupFares(db, target)
     target.updatedAt = new Date().toISOString()
     return target
   })
