@@ -226,11 +226,13 @@ export default function StudentHome() {
       const result = await api.cancelRide(cancelRideTarget.id)
       setCancelRideTarget(null)
       notify('Your ride place was cancelled.', 'success')
-      setSuccess(result.tripPreserved
-        ? 'Your place was cancelled. The driver and trip remain available for other students.'
-        : result.seatReopened
-          ? 'Your place was cancelled and the released seat is available to another student.'
-          : 'Your place was cancelled. The seat stays locked because the booking cutoff has passed.')
+      setSuccess(result.driverAssigned
+        ? 'Your place was cancelled. The accepted driver and remaining shared trip stay active.'
+        : result.tripPreserved
+          ? 'Your place was cancelled. The remaining rider’s request stays active and the released seat can be joined.'
+          : cancelRideTarget.sharingMode === 'private'
+            ? 'Your private booking was cancelled.'
+            : 'Your open-to-share request was cancelled because no rider remained or the booking window had closed.')
       await refreshData()
     } catch (err) {
       notify(err.message, 'error')
