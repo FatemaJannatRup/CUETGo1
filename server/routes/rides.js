@@ -85,19 +85,35 @@ function activeRider(db, ride) {
     ? ride.passengers.filter((passenger) => !passenger.isGuest && passenger.studentId)
     : []
   const primary = registered.find((passenger) => passenger.studentId === ride.studentId) || registered[0]
-  return primary ? db.students.find((student) => student.id === primary.studentId) : rideOwner(db, ride)
+  if (primary) return db.students.find((student) => student.id === primary.studentId)
+  if (ride.sharedGroupId) {
+    const related = rideGroupRecords(db, ride).find((item) =>
+      item.id !== ride.id && Array.isArray(item.passengers) &&
+      item.passengers.some((passenger) => !passenger.isGuest && passenger.studentId)
+    )
+    if (related) return activeRider(db, related)
+  }
+  return rideOwner(db, ride)
 }
-function effectiveRidePreference(ride) {
+function effectiveRidePreference(ride, db) {
   const registered = Array.isArray(ride.passengers)
     ? ride.passengers.filter((passenger) => !passenger.isGuest && passenger.studentId)
     : []
   const creatorStillRiding = registered.some((passenger) => passenger.studentId === ride.studentId)
-  if (creatorStillRiding || !registered.length) return ride.genderPreference || 'any'
-  return registered[0].genderPreference || 'any'
+  if (creatorStillRiding) return ride.genderPreference || 'any'
+  if (registered.length) return registered[0].genderPreference || 'any'
+  if (db && ride.sharedGroupId) {
+    const related = rideGroupRecords(db, ride).find((item) =>
+      item.id !== ride.id && Array.isArray(item.passengers) &&
+      item.passengers.some((passenger) => !passenger.isGuest && passenger.studentId)
+    )
+    if (related) return effectiveRidePreference(related, db)
+  }
+  return ride.genderPreference || 'any'
 }
 function canJoinRide(db, ride, student) {
   return ride.sharingMode === 'share' && Boolean(student) &&
-    genderAllows(effectiveRidePreference(ride), student.gender) && totalGroupSeats(db, ride) < 2
+    genderAllows(effectiveRidePreference(ride, db), student.gender) && totalGroupSeats(db, ride) < 2
 }
 function shareRequestsCompatible(db, rides) {
   if (rides.length < 2) return true
@@ -105,7 +121,7 @@ function shareRequestsCompatible(db, rides) {
   const riders = rides.map((ride) => activeRider(db, ride))
   if (riders.some((rider) => !rider)) return false
   return rides.every((ride, index) =>
-    genderAllows(effectiveRidePreference(ride), riders[1 - index].gender) &&
+    genderAllows(effectiveRidePreference(ride, db), riders[1 - index].gender) &&
     genderAllows(riders[index].genderPreference || 'any', riders[1 - index].gender)
   )
 }
@@ -303,7 +319,7 @@ router.get('/open', requireAuth('student'), async (req, res) => {
         driverCancelledAt: ride.driverCancelledAt || null,
         hostName: activeRider(db, ride)?.username || activeRider(db, ride)?.name || host?.username || host?.name || 'Campus rider',
         sharingMode: ride.sharingMode || 'private',
-        genderPreference: effectiveRidePreference(ride),
+        genderPreference: effectiveRidePreference(ride, db),
         seats: seatsUsed,
         seatsLeft: Math.max(0, 2 - seatsUsed),
         riderCount: totalGroupRiders(db, ride),
