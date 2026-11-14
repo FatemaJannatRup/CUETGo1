@@ -80,16 +80,34 @@ function genderAllows(preference, gender) {
 function rideOwner(db, ride) {
   return db.students.find((student) => student.id === ride.studentId)
 }
+function activeRider(db, ride) {
+  const registered = Array.isArray(ride.passengers)
+    ? ride.passengers.filter((passenger) => !passenger.isGuest && passenger.studentId)
+    : []
+  const primary = registered.find((passenger) => passenger.studentId === ride.studentId) || registered[0]
+  return primary ? db.students.find((student) => student.id === primary.studentId) : rideOwner(db, ride)
+}
+function effectiveRidePreference(ride) {
+  const registered = Array.isArray(ride.passengers)
+    ? ride.passengers.filter((passenger) => !passenger.isGuest && passenger.studentId)
+    : []
+  const creatorStillRiding = registered.some((passenger) => passenger.studentId === ride.studentId)
+  if (creatorStillRiding || !registered.length) return ride.genderPreference || 'any'
+  return registered[0].genderPreference || 'any'
+}
 function canJoinRide(db, ride, student) {
   return ride.sharingMode === 'share' && Boolean(student) &&
-    genderAllows(ride.genderPreference, student.gender) && totalGroupSeats(db, ride) < 2
+    genderAllows(effectiveRidePreference(ride), student.gender) && totalGroupSeats(db, ride) < 2
 }
 function shareRequestsCompatible(db, rides) {
   if (rides.length < 2) return true
   if (!rides.every((ride) => ride.sharingMode === 'share')) return false
-  const owners = rides.map((ride) => rideOwner(db, ride))
-  if (owners.some((owner) => !owner)) return false
-  return rides.every((ride, index) => genderAllows(ride.genderPreference, owners[1 - index].gender))
+  const riders = rides.map((ride) => activeRider(db, ride))
+  if (riders.some((rider) => !rider)) return false
+  return rides.every((ride, index) =>
+    genderAllows(effectiveRidePreference(ride), riders[1 - index].gender) &&
+    genderAllows(riders[index].genderPreference || 'any', riders[1 - index].gender)
+  )
 }
 function recalculateRide(ride) {
   const passengers = Array.isArray(ride.passengers) ? ride.passengers : []
@@ -282,9 +300,9 @@ router.get('/open', requireAuth('student'), async (req, res) => {
         createdAt: ride.createdAt,
         status: ride.status,
         driverCancelledAt: ride.driverCancelledAt || null,
-        hostName: host?.username || host?.name || 'Campus rider',
+        hostName: activeRider(db, ride)?.username || activeRider(db, ride)?.name || host?.username || host?.name || 'Campus rider',
         sharingMode: ride.sharingMode || 'private',
-        genderPreference: ride.genderPreference || 'any',
+        genderPreference: effectiveRidePreference(ride),
         seats: seatsUsed,
         seatsLeft: Math.max(0, 2 - seatsUsed),
         riderCount: totalGroupRiders(db, ride),
@@ -384,7 +402,7 @@ router.post('/request', requireAuth('student'), async (req, res) => {
     ['pending', 'accepted', 'arrived'].includes(candidate.status) &&
     canJoinRide(db, candidate, requester) &&
     candidate.sharingMode === 'share' &&
-    genderAllows(genderPreference, rideOwner(db, candidate)?.gender) &&
+    genderAllows(genderPreference, activeRider(db, candidate)?.gender) &&
     sameRoute(candidate, ride) &&
     Math.abs(pickupTime(candidate) - pickupTime(ride)) <= MATCH_WINDOW_MS &&
     pickupTime(candidate) > Date.now() + BOOKING_CUTOFF_MS
@@ -427,7 +445,7 @@ router.post('/:id/join', requireAuth('student'), async (req, res) => {
 
     const student = db.students.find((item) => item.id === req.user.id)
     if (!student) throw fail(404, 'Student account not found.')
-    if (!canJoinRide(db, target, student) || !genderAllows(joinerPreference, rideOwner(db, target)?.gender)) {
+    if (!canJoinRide(db, target, student) || !genderAllows(joinerPreference, activeRider(db, target)?.gender)) {
       throw fail(403, 'Your gender preferences are not mutually compatible with this ride.')
     }
 
@@ -464,6 +482,7 @@ router.post('/:id/join', requireAuth('student'), async (req, res) => {
       seatCount: 1,
       isGuest: false,
       joinedAt,
+      genderPreference: joinerPreference,
       fareShare: 0,
     })
     recalculateSharedGroupFares(db, target)
