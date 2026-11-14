@@ -270,6 +270,7 @@ router.get('/open', requireAuth('student'), async (req, res) => {
         driverCancelledAt: ride.driverCancelledAt || null,
         hostName: host?.username || host?.name || 'Campus rider',
         genderPreference: ride.genderPreference || 'any',
+        hostGender: host?.gender || 'unknown',
         seats: seatsUsed,
         seatsLeft: Math.max(0, 2 - seatsUsed),
         riderCount: totalGroupRiders(db, ride),
@@ -540,12 +541,15 @@ router.get('/mine', requireAuth('student'), async (req, res) => {
 
   const withMatches = await Promise.all(mine.map(async (ride) => {
     if (!['pending', 'accepted', 'arrived'].includes(ride.status) || !isBeforeCutoff(ride)) return ride
-    const candidates = db.rides.filter((candidate) =>
+    const candidates = ride.sharingMode === 'share' ? db.rides.filter((candidate) =>
       candidate.id !== ride.id &&
       ['pending', 'accepted', 'arrived'].includes(candidate.status) &&
+      candidate.sharingMode === 'share' &&
       totalGroupSeats(db, candidate) < 2 &&
+      sameRoute(candidate, ride) &&
+      shareRequestsCompatible(db, [ride, candidate]) &&
       pickupTime(candidate) > Date.now() + BOOKING_CUTOFF_MS
-    )
+    ) : []
     const matches = await findMatches(ride, candidates, { useAI: false })
     return { ...ride, matchDetails: matches }
   }))
