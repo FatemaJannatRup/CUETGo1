@@ -370,9 +370,9 @@ export default function StudentHome() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-bold uppercase tracking-[0.14em] text-ink/60">Seats</label>
-                    <select value={form.seats} onChange={(e) => setForm({ ...form, seats: Number(e.target.value) })} className="mt-1 w-full rounded-2xl border border-sky-100 bg-sky-50 px-3 py-3 text-ink focus:outline-none focus:border-sky-400">
+                    <select value={form.seats} onChange={(e) => setForm({ ...form, seats: Number(e.target.value), sharingMode: e.target.value === '2' ? 'private' : form.sharingMode })} className="mt-1 w-full rounded-2xl border border-sky-100 bg-sky-50 px-3 py-3 text-ink focus:outline-none focus:border-sky-400">
                       <option value={1}>1 seat</option>
-                      <option value={2}>2 seats</option>
+                      <option value={2}>2 seats (private)</option>
                     </select>
                   </div>
                   <div>
