@@ -250,6 +250,7 @@ router.get('/open', requireAuth('student'), async (req, res) => {
   const db = await readDbAndExpirePending()
   const now = Date.now()
   const seenGroups = new Set()
+  const requestedPreference = ['male', 'female'].includes(req.query.genderPreference) ? req.query.genderPreference : 'any'
   const rides = db.rides
     .filter((ride) => {
       const currentStudent = db.students.find((student) => student.id === req.user.id)
@@ -257,6 +258,7 @@ router.get('/open', requireAuth('student'), async (req, res) => {
           ride.sharingMode !== 'share' ||
           pickupTime(ride) <= now + BOOKING_CUTOFF_MS ||
           !canJoinRide(db, ride, currentStudent) ||
+          !genderAllows(requestedPreference, rideOwner(db, ride)?.gender) ||
           studentIsOnRideGroup(db, ride, req.user.id)) return false
       const groupKey = ride.sharedGroupId || ride.id
       if (seenGroups.has(groupKey)) return false
@@ -277,7 +279,6 @@ router.get('/open', requireAuth('student'), async (req, res) => {
         driverCancelledAt: ride.driverCancelledAt || null,
         hostName: host?.username || host?.name || 'Campus rider',
         genderPreference: ride.genderPreference || 'any',
-        hostGender: host?.gender || 'unknown',
         seats: seatsUsed,
         seatsLeft: Math.max(0, 2 - seatsUsed),
         riderCount: totalGroupRiders(db, ride),
