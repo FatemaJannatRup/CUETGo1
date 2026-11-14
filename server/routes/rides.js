@@ -731,6 +731,7 @@ router.post('/accept', requireAuth('driver'), requireApprovedDriver, async (req,
           sibling.fare = 0
           sibling.farePaymentMode = 'none'
         } else if (['pending', 'accepted', 'arrived'].includes(sibling.status)) {
+          if (!Array.isArray(sibling.passengers)) sibling.passengers = normalizePassengers(sibling, rideOwner(db, sibling))
           recalculateRide(sibling)
         }
         sibling.updatedAt = detachedAt
