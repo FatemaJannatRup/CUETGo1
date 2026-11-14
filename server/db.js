@@ -83,6 +83,46 @@ export async function initializeDatabase() {
        OR data->>'farePaymentMode' IS NULL;
   `)
 
+  // Existing accepted shared groups must split the one vehicle fare across both bookings.
+  await pool.query(`
+    WITH active_groups AS (
+      SELECT
+        data->>'sharedGroupId' AS group_id,
+        COUNT(*) AS ride_count,
+        SUM(COALESCE(NULLIF(data->>'seats','')::integer, 1)) AS seat_count,
+        MIN(COALESCE(NULLIF(data->>'seats','')::integer, 1)) AS min_seats,
+        MAX(COALESCE(NULLIF(data->>'seats','')::integer, 1)) AS max_seats
+      FROM cuetgo_rides
+      WHERE data->>'sharingMode' = 'share'
+        AND data->>'sharedGroupId' IS NOT NULL
+        AND status IN ('pending', 'accepted', 'arrived')
+      GROUP BY data->>'sharedGroupId'
+    )
+    UPDATE cuetgo_rides AS ride
+    SET fare = COALESCE(
+          NULLIF(ride.data->>'farePerSeat','')::numeric,
+          NULLIF(ride.data->>'fare','')::numeric,
+          0
+        ) / 2,
+        data = ride.data || jsonb_build_object(
+          'fare',
+          to_jsonb(COALESCE(
+            NULLIF(ride.data->>'farePerSeat','')::numeric,
+            NULLIF(ride.data->>'fare','')::numeric,
+            0
+          ) / 2),
+          'farePaymentMode',
+          'split'
+        )
+    FROM active_groups AS shared
+    WHERE ride.data->>'sharedGroupId' = shared.group_id
+      AND shared.ride_count = 2
+      AND shared.seat_count = 2
+      AND shared.min_seats = 1
+      AND shared.max_seats = 1
+      AND ride.status IN ('pending', 'accepted', 'arrived');
+  `)
+
   // Remove only records created by the temporary demo seed. Real user data is preserved.
   const removed = await pool.query(`
     DELETE FROM cuetgo_rides WHERE id LIKE 'demo-%' OR data->>'demo' = 'true';
