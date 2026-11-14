@@ -187,6 +187,7 @@ export default function StudentHome() {
     try {
       const payload = {
         seats: 1,
+        genderPreference: form.sharingMode === 'share' ? form.genderPreference : 'any',
         phone: user?.phone || '',
         info: 'Joining this ride',
         coPassengerName: '',
