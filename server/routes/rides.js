@@ -218,6 +218,7 @@ function studentRideView(ride, viewerId) {
     'bookingClosesAt', 'matchDetails', 'sharingMode', 'genderPreference',
     'farePaymentMode', 'sharedGroupId',
   ]) if (ride[field] !== undefined) safeRide[field] = ride[field]
+  if (ride.sharingMode === 'share') safeRide.genderPreference = effectiveRidePreference(ride)
   const passengers = Array.isArray(ride.passengers) ? ride.passengers : []
   const mine = passengers.find((passenger) => passenger.studentId === viewerId)
   const registered = passengers.filter((passenger) => !passenger.isGuest && passenger.studentId)
@@ -233,7 +234,7 @@ function studentRideView(ride, viewerId) {
     isCreator,
     canEdit: isCreator && ride.status === 'pending' && !ride.sharedGroupId &&
       registered.length === 1 && isBeforeCutoff(ride),
-    passengers: passengers.map(({ phone, nid, nidHash, studentId, ...passenger }) => passenger),
+    passengers: passengers.map(({ phone, nid, nidHash, studentId, genderPreference, ...passenger }) => passenger),
   }
 }
 
