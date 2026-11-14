@@ -266,7 +266,7 @@ export default function DriverHome() {
                           <p className="font-bold text-ink">{ride.from} → {ride.to}</p>
                           <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold uppercase text-amber-700">{ride.status}</span>
                         </div>
-                        <p className="text-xs text-ink/60 mt-2">{formatTime(ride.requestedTime || ride.createdAt)} • {ride.seats || 1} সিট</p>
+                        <p className="text-xs text-ink/60 mt-2">{formatTime(ride.requestedTime || ride.createdAt)} • {ride.seats ?? 1} সিট</p>
                         <p className="text-xs text-ink/60 mt-1">যাত্রী: {ride.passengers?.map((item) => item.name).join(', ') || 'যাত্রী(গণ)'}</p>
                         {ride.status === 'accepted' && (
                           <div className="grid grid-cols-2 gap-2 mt-3">
