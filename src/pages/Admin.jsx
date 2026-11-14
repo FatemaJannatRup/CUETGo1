@@ -12,6 +12,20 @@ function Stat({ label, value, hint }) {
 
 export default function Admin() {
   const notify = useFeedback()
+  const forwardVerticalWheel = (event) => {
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX) || Math.abs(event.deltaY) < 1) return
+    // Only take over wheel events from horizontal scrollers; normal panel text
+    // already scrolls the main screen naturally.
+    if (!event.target.closest('.admin-table-wrap, .admin-tabs')) return
+    const screenScroller = event.currentTarget.closest('.phone-screen')?.querySelector('.screen-scroll')
+    if (screenScroller) {
+      screenScroller.scrollTop += event.deltaY
+      event.preventDefault()
+      return
+    }
+    window.scrollBy({ top: event.deltaY, left: 0, behavior: 'auto' })
+    event.preventDefault()
+  }
   const [admin, setAdmin] = useState(null)
   const [checking, setChecking] = useState(true)
   const [email, setEmail] = useState('')
@@ -135,9 +149,9 @@ export default function Admin() {
     }
   }
 
-  if (checking) return <div className="admin-page"><div className="admin-loading">Checking administrator session…</div></div>
+  if (checking) return <div className="admin-page" onWheel={forwardVerticalWheel}><div className="admin-loading">Checking administrator session…</div></div>
 
-  if (!admin) return <div className="admin-page admin-login-page">
+  if (!admin) return <div className="admin-page admin-login-page" onWheel={forwardVerticalWheel}>
     <Link className="admin-back" to="/">← Back to CUETGo</Link>
     <div className="admin-login-card">
       <div className="admin-mark">C</div>
@@ -156,7 +170,7 @@ export default function Admin() {
     </div>
   </div>
 
-  return <div className="admin-page">
+  return <div className="admin-page" onWheel={forwardVerticalWheel}>
     <header className="admin-header">
       <div><div className="admin-brand"><span className="admin-mark-small">C</span> CUET<span>Go</span> <b>ADMIN</b></div><p>Platform control centre</p></div>
       <div className="admin-header-actions"><span>{admin.email}</span><button onClick={() => { notify('Refreshing dashboard…', 'loading', 0); loadDashboard().then(ok => { if (ok) notify('Dashboard updated.', 'success'); else notify('Could not refresh the dashboard.', 'error') }) }} disabled={loading}>↻ Refresh</button><button onClick={() => { notify('Signing out…', 'loading', 0); window.setTimeout(logout, 500) }}>Sign out</button></div>
@@ -187,7 +201,7 @@ export default function Admin() {
 
         {activeTab === 'Students' && <section className="admin-panel"><div className="admin-section-heading"><div><h2>Student accounts</h2><p>Registered CUET student accounts. Sensitive credentials are not displayed.</p></div><span className="admin-count">{students.length} students</span></div>{students.length === 0 ? <div className="admin-empty">No student accounts found.</div> : <div className="admin-table-wrap"><table><thead><tr><th>Student</th><th>CUET ID</th><th>Hall</th><th>Gender</th><th>Joined</th></tr></thead><tbody>{students.map((student) => <tr key={student.id}><td><strong>{student.username || '—'}</strong><small>{student.email}</small></td><td>{student.studentId || '—'}</td><td>{student.hall || '—'}</td><td>{student.gender || '—'}</td><td>{dateLabel(student.createdAt)}</td></tr>)}</tbody></table></div>}</section>}
 
-        {activeTab === 'Rides' && <section className="admin-panel"><div className="admin-section-heading"><div><h2>Ride management</h2><p>Monitor ride requests and cancel pending or active rides when necessary.</p></div><span className="admin-count">{rides.length} rides</span></div>{rides.length === 0 ? <div className="admin-empty">No ride records found.</div> : <div className="admin-table-wrap"><table><thead><tr><th>Route</th><th>Student</th><th>Driver</th><th>Fare</th><th>Requested</th><th>Status</th><th>Action</th></tr></thead><tbody>{rides.map((ride) => <tr key={ride.id}><td><strong>{ride.from}</strong><small>to {ride.to}</small></td><td>{ride.studentName}<small>{ride.studentEmail}</small></td><td>{ride.driverName || '—'}<small>{ride.driverPhone}</small></td><td>৳{ride.fare ?? '—'}</td><td>{dateLabel(ride.requestedTime)}</td><td><span className={`admin-status status-${ride.status}`}>{ride.status}</span></td><td>{['pending','accepted','arrived'].includes(ride.status) ? <button className="admin-cancel" disabled={busyId === ride.id} onClick={() => cancelRide(ride.id)}>Cancel ride</button> : '—'}</td></tr>)}</tbody></table></div>}</section>}
+        {activeTab === 'Rides' && <section className="admin-panel"><div className="admin-section-heading"><div><h2>Ride management</h2><p>Monitor ride requests and cancel pending or active rides when necessary.</p></div><span className="admin-count">{rides.length} rides</span></div>{rides.length === 0 ? <div className="admin-empty">No ride records found.</div> : <div className="admin-table-wrap"><table><thead><tr><th>Route</th><th>Student</th><th>Driver</th><th>Fare</th><th>Sharing</th><th>Requested</th><th>Status</th><th>Action</th></tr></thead><tbody>{rides.map((ride) => <tr key={ride.id}><td><strong>{ride.from}</strong><small>to {ride.to}</small></td><td>{ride.studentName}<small>{ride.studentEmail}</small></td><td>{ride.driverName || '—'}<small>{ride.driverPhone}</small></td><td>৳{ride.fare ?? '—'}</td><td>{ride.sharingMode === 'share' ? `Open · ${ride.genderPreference || 'any'}` : 'Private'}</td><td>{dateLabel(ride.requestedTime)}</td><td><span className={`admin-status status-${ride.status}`}>{ride.status}</span></td><td>{['pending','accepted','arrived'].includes(ride.status) ? <button className="admin-cancel" disabled={busyId === ride.id} onClick={() => cancelRide(ride.id)}>Cancel ride</button> : '—'}</td></tr>)}</tbody></table></div>}</section>}
       </>}
       <footer className="admin-footer">CUETGo Administration · Keep account information confidential.</footer>
     </main>

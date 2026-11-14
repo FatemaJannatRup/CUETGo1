@@ -337,7 +337,7 @@ body { background:#edf4f8; color:var(--ink); }
 .admin-quick-actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:15px; }
 .admin-quick-actions button { display:flex; gap:12px; align-items:center; padding:12px 14px; border:1px solid #dfebf1; border-radius:10px; background:#f8fbfc; color:#315c75; font-size:11px; font-weight:750; cursor:pointer; }
 .admin-quick-actions b { color:#2780a9; }
-.admin-table-wrap { width:100%; overflow-x:auto; }
+ .admin-table-wrap { width:100%; overflow-x:auto; overflow-y:hidden; overscroll-behavior-y:contain; }
 .admin-table-wrap table { width:100%; border-collapse:collapse; min-width:760px; font-size:11px; text-align:left; }
 .admin-table-wrap th { padding:12px 10px; border-bottom:1px solid #e7eef2; color:#8296a2; font-size:9px; letter-spacing:.8px; text-transform:uppercase; white-space:nowrap; }
 .admin-table-wrap td { padding:13px 10px; border-bottom:1px solid #eef2f5; color:#4d697b; vertical-align:middle; }
@@ -1009,3 +1009,13 @@ body {
   .ride-status-pill { padding: 6px 8px; font-size: 9px; }
   .ride-route-title { font-size: 15px; }
 }
+
+
+/* Keep one vertical scroll owner for the student/driver app. Nested dashboard
+   overflow containers can otherwise swallow wheel input on desktop browsers. */
+.app-main { overflow-y: visible !important; }
+.screen-scroll { overscroll-behavior-y: contain; }
+
+/* Admin tables scroll horizontally; the Admin page forwards vertical wheel input
+   to the app-screen scroll container. */
+.admin-table-wrap { scrollbar-gutter: stable; }
