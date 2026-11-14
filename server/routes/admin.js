@@ -170,6 +170,9 @@ router.get('/rides', requireAuth('admin'), async (req, res) => {
       to: ride.to,
       fare: ride.fare,
       seats: ride.seats,
+      sharingMode: ride.sharingMode || 'private',
+      genderPreference: ride.genderPreference || 'any',
+      farePaymentMode: ride.farePaymentMode || 'single-payer',
       status: ride.status,
       requestedTime: ride.requestedTime || ride.createdAt,
       createdAt: ride.createdAt,
@@ -204,6 +207,9 @@ router.patch('/rides/:id/cancel', requireAuth('admin'), async (req, res) => {
       ride.cancelledAt = cancelledAt
       ride.cancelledBy = 'admin'
       ride.driverId = null
+      ride.fare = 0
+      ride.farePaymentMode = 'none'
+      for (const passenger of ride.passengers || []) passenger.fareShare = 0
       delete ride.sharedGroupId
       ride.updatedAt = cancelledAt
     }
