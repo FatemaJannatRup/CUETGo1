@@ -655,7 +655,11 @@ export default function StudentHome() {
           <section role="dialog" aria-modal="true" aria-labelledby="student-cancel-title" className="w-full max-w-sm rounded-3xl border border-white/70 bg-white p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-2xl">⚠️</div>
             <h2 id="student-cancel-title" className="text-lg font-bold text-ink">Cancel your ride place?</h2>
-            <p className="mt-2 text-sm leading-relaxed text-ink/65">Are you sure you want to cancel your place? If a driver has accepted, the trip can remain available to other students. If no driver has accepted and nobody else is travelling, the request will be removed.</p>
+            <p className="mt-2 text-sm leading-relaxed text-ink/65">{cancelRideTarget.isCreator
+              ? cancelRideTarget.sharingMode === 'share'
+                ? 'Cancelling removes your seat. Any registered student who already joined can continue, and the released seat may be offered to another compatible student.'
+                : 'This is a private booking. Cancelling removes your booking, including the companion seat.'
+              : 'You will leave only your own seat. The creator and any other registered passenger remain booked.'}</p>
             <div className="mt-4 rounded-2xl bg-sky-50 p-3 text-sm font-semibold text-ink">{cancelRideTarget.from} → {cancelRideTarget.to}</div>
             <div className="mt-5 flex gap-2">
               <button type="button" disabled={canceling} onClick={() => setCancelRideTarget(null)} className="secondary-btn flex-1 rounded-xl px-3 py-3 text-sm">Keep ride</button>
