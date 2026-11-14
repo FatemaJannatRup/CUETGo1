@@ -711,6 +711,32 @@ router.post('/accept', requireAuth('driver'), requireApprovedDriver, async (req,
     ))
     if (conflict) throw fail(409, 'This request overlaps with another accepted trip in your schedule.')
 
+    // If only part of a previously shared group is accepted, detach the
+    // remaining requests. Otherwise an old group key could hide free seats or
+    // make two independently assigned drivers look like one trip.
+    const selectedIds = new Set(selected.map((ride) => ride.id))
+    const previousGroupIds = new Set(selected.map((ride) => ride.sharedGroupId).filter(Boolean))
+    if (previousGroupIds.size) {
+      const detachedAt = new Date().toISOString()
+      for (const sibling of db.rides) {
+        if (!previousGroupIds.has(sibling.sharedGroupId) || selectedIds.has(sibling.id)) continue
+        delete sibling.sharedGroupId
+        if (['pending', 'accepted', 'arrived'].includes(sibling.status) && occupiedSeats(sibling) === 0) {
+          sibling.status = 'cancelled'
+          sibling.cancelledAt = detachedAt
+          sibling.cancelledBy = 'empty-shared-seat'
+          sibling.driverId = null
+          sibling.seats = 0
+          sibling.passengerCount = 0
+          sibling.fare = 0
+          sibling.farePaymentMode = 'none'
+        } else if (['pending', 'accepted', 'arrived'].includes(sibling.status)) {
+          recalculateRide(sibling)
+        }
+        sibling.updatedAt = detachedAt
+      }
+    }
+
     const sharedGroupId = crypto.randomUUID()
     for (const ride of selected) {
       ride.status = 'accepted'
