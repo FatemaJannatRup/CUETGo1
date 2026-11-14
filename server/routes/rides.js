@@ -73,18 +73,61 @@ function normalizePassengers(ride, fallbackStudent) {
   }]
 }
 
+function genderAllows(preference, gender) {
+  const wanted = ['male', 'female'].includes(preference) ? preference : 'any'
+  return wanted === 'any' || gender === wanted
+}
+function rideOwner(db, ride) {
+  return db.students.find((student) => student.id === ride.studentId)
+}
+function canJoinRide(db, ride, student) {
+  return ride.sharingMode === 'share' && Boolean(student) &&
+    genderAllows(ride.genderPreference, student.gender) && totalGroupSeats(db, ride) < 2
+}
+function shareRequestsCompatible(db, rides) {
+  if (rides.length < 2) return true
+  if (!rides.every((ride) => ride.sharingMode === 'share')) return false
+  const owners = rides.map((ride) => rideOwner(db, ride))
+  if (owners.some((owner) => !owner)) return false
+  return rides.every((ride, index) => genderAllows(ride.genderPreference, owners[1 - index].gender))
+}
 function recalculateRide(ride) {
   const passengers = Array.isArray(ride.passengers) ? ride.passengers : []
   const seats = passengers.reduce((sum, passenger) => sum + passengerSeats(passenger), 0)
+  const baseFare = farePerSeat(ride.from, ride.to)
+  const registered = passengers.filter((passenger) => !passenger.isGuest && passenger.studentId)
+  const split = ride.sharingMode === 'share' && registered.length === 2 &&
+    registered.every((passenger) => passengerSeats(passenger) === 1)
+  const payerId = registered.some((passenger) => passenger.studentId === ride.studentId)
+    ? ride.studentId : registered[0]?.studentId
   ride.seats = seats
   ride.passengerCount = seats
-  ride.farePerSeat = farePerSeat(ride.from, ride.to)
-  ride.fare = ride.farePerSeat * seats
+  ride.farePerSeat = baseFare
+  ride.fare = baseFare
+  ride.farePaymentMode = split ? 'split' : 'single-payer'
+  for (const passenger of passengers) {
+    passenger.fareShare = split && !passenger.isGuest ? baseFare / 2
+      : passenger.studentId === payerId ? baseFare : 0
+  }
+}
+function recalculateSharedGroupFares(db, ride) {
+  if (!ride.sharedGroupId) { recalculateRide(ride); return }
+  const group = rideGroupRecords(db, ride)
+  const split = group.length === 2 && group.reduce((sum, item) => sum + occupiedSeats(item), 0) === 2 &&
+    group.every((item) => item.sharingMode === 'share' && occupiedSeats(item) === 1)
+  for (const item of group) {
+    recalculateRide(item)
+    if (split) {
+      item.farePaymentMode = 'split'
+      item.fare = item.farePerSeat / 2
+      for (const passenger of item.passengers || []) passenger.fareShare = passenger.isGuest ? 0 : item.farePerSeat / 2
+    }
+  }
 }
 
 function studentIsOnRide(ride, studentId) {
-  return ride.studentId === studentId ||
-    (Array.isArray(ride.passengers) && ride.passengers.some((passenger) => passenger.studentId === studentId))
+  if (Array.isArray(ride.passengers)) return ride.passengers.some((passenger) => passenger.studentId === studentId)
+  return ride.studentId === studentId
 }
 
 function rideGroupRecords(db, ride) {
@@ -128,9 +171,10 @@ function assignedRideGroup(db, target, driverId) {
   return db.rides.filter((ride) => ride.sharedGroupId === target.sharedGroupId && ride.driverId === driverId)
 }
 
-function validSharedGroup(rides) {
+function validSharedGroup(rides, db) {
   if (!Array.isArray(rides) || rides.length < 1 || rides.length > 2) return false
   if (!rides.every((ride) => sameRoute(ride, rides[0]))) return false
+  if (rides.length > 1 && (!db || !shareRequestsCompatible(db, rides))) return false
   const times = rides.map(pickupTime)
   if (times.some((time) => !Number.isFinite(time))) return false
   if (Math.max(...times) - Math.min(...times) > MATCH_WINDOW_MS) return false
@@ -143,18 +187,22 @@ function studentName(db, studentId) {
 }
 
 // Student-facing ride payloads deliberately omit passenger phone numbers.
-function studentRideView(ride) {
+function studentRideView(ride, viewerId) {
   const safeRide = {}
   for (const field of [
     'id', 'from', 'to', 'fare', 'farePerSeat', 'seats', 'passengerCount',
     'status', 'requestedTime', 'createdAt', 'updatedAt', 'driverCancelledAt',
-    'bookingClosesAt', 'matchDetails',
-  ]) {
-    if (ride[field] !== undefined) safeRide[field] = ride[field]
-  }
+    'bookingClosesAt', 'matchDetails', 'sharingMode', 'genderPreference',
+    'farePaymentMode', 'sharedGroupId',
+  ]) if (ride[field] !== undefined) safeRide[field] = ride[field]
   const passengers = Array.isArray(ride.passengers) ? ride.passengers : []
+  const mine = passengers.find((passenger) => passenger.studentId === viewerId)
+  const isCreator = ride.studentId === viewerId && Boolean(mine) && !ride.ownerCancelledAt
   return {
     ...safeRide,
+    myFare: mine ? Number(mine.fareShare ?? 0) : 0,
+    isCreator,
+    canEdit: isCreator && ride.status === 'pending' && !ride.sharedGroupId && isBeforeCutoff(ride),
     passengers: passengers.map(({ phone, nid, nidHash, studentId, ...passenger }) => passenger),
   }
 }
@@ -197,9 +245,11 @@ router.get('/open', requireAuth('student'), async (req, res) => {
   const seenGroups = new Set()
   const rides = db.rides
     .filter((ride) => {
+      const currentStudent = db.students.find((student) => student.id === req.user.id)
       if (!['pending', 'accepted', 'arrived'].includes(ride.status) ||
+          ride.sharingMode !== 'share' ||
           pickupTime(ride) <= now + BOOKING_CUTOFF_MS ||
-          totalGroupSeats(db, ride) >= 2 ||
+          !canJoinRide(db, ride, currentStudent) ||
           studentIsOnRideGroup(db, ride, req.user.id)) return false
       const groupKey = ride.sharedGroupId || ride.id
       if (seenGroups.has(groupKey)) return false
@@ -219,6 +269,7 @@ router.get('/open', requireAuth('student'), async (req, res) => {
         status: ride.status,
         driverCancelledAt: ride.driverCancelledAt || null,
         hostName: host?.username || host?.name || 'Campus rider',
+        genderPreference: ride.genderPreference || 'any',
         seats: seatsUsed,
         seatsLeft: Math.max(0, 2 - seatsUsed),
         riderCount: totalGroupRiders(db, ride),
@@ -230,7 +281,7 @@ router.get('/open', requireAuth('student'), async (req, res) => {
 })
 
 router.post('/request', requireAuth('student'), async (req, res) => {
-  const { from, to, requestedTime, seats = 1, coPassengerName = '', coPassengerPhone = '', coPassengerInfo = '' } = req.body || {}
+  const { from, to, requestedTime, seats = 1, sharingMode = 'private', genderPreference = 'any', coPassengerName = '', coPassengerPhone = '', coPassengerInfo = '' } = req.body || {}
   if (!LOCATIONS.includes(from) || !LOCATIONS.includes(to) || from === to) {
     return res.status(400).json({ message: 'Choose two different CUET locations.' })
   }
@@ -241,6 +292,9 @@ router.post('/request', requireAuth('student'), async (req, res) => {
   }
   const seatCount = Number(seats)
   if (![1, 2].includes(seatCount)) return res.status(400).json({ message: 'A rickshaw has only 1 or 2 seats.' })
+  if (!['private', 'share'].includes(sharingMode)) return res.status(400).json({ message: 'Choose private or open-to-share.' })
+  if (!['any', 'male', 'female'].includes(genderPreference)) return res.status(400).json({ message: 'Choose a valid gender preference.' })
+  if (sharingMode === 'share' && seatCount !== 1) return res.status(400).json({ message: 'Open-to-share bookings reserve one seat only. Choose private for two seats.' })
   if (seatCount === 2) {
     const guestName = String(coPassengerName).trim()
     const guestPhone = String(coPassengerPhone).trim()
@@ -268,7 +322,10 @@ router.post('/request', requireAuth('student'), async (req, res) => {
       from,
       to,
       farePerSeat: farePerSeat(from, to),
-      fare: farePerSeat(from, to) * seatCount,
+      fare: farePerSeat(from, to),
+      sharingMode,
+      genderPreference: sharingMode === 'share' ? genderPreference : 'any',
+      farePaymentMode: 'single-payer',
       requestedTime: new Date(requestedAt).toISOString(),
       seats: seatCount,
       passengerCount: seatCount,
@@ -282,6 +339,7 @@ router.post('/request', requireAuth('student'), async (req, res) => {
         info: 'Primary rider',
         seatCount: 1,
         isGuest: false,
+        fareShare: farePerSeat(from, to),
       }],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -305,12 +363,17 @@ router.post('/request', requireAuth('student'), async (req, res) => {
   // Candidate discovery is intentionally outside the DB transaction. Gemini
   // can never hold a seat lock or block a booking if its API is slow.
   const db = await readDb()
-  const candidates = db.rides.filter((candidate) =>
+  const requester = db.students.find((student) => student.id === req.user.id)
+  const candidates = sharingMode === 'share' ? db.rides.filter((candidate) =>
     candidate.id !== ride.id &&
     ['pending', 'accepted', 'arrived'].includes(candidate.status) &&
-    totalGroupSeats(db, candidate) < 2 &&
+    canJoinRide(db, candidate, requester) &&
+    candidate.sharingMode === 'share' &&
+    genderAllows(genderPreference, rideOwner(db, candidate)?.gender) &&
+    sameRoute(candidate, ride) &&
+    Math.abs(pickupTime(candidate) - pickupTime(ride)) <= MATCH_WINDOW_MS &&
     pickupTime(candidate) > Date.now() + BOOKING_CUTOFF_MS
-  )
+  ) : []
   const matches = await findMatches(ride, candidates)
   const matchDetails = matches.map((match) => {
     const candidate = candidates.find((item) => item.id === match.rideId)
@@ -323,18 +386,12 @@ router.post('/request', requireAuth('student'), async (req, res) => {
     } : null
   }).filter(Boolean)
 
-  res.status(201).json({ ride: studentRideView(ride), matches: matchDetails })
+  res.status(201).json({ ride: studentRideView(ride, req.user.id), matches: matchDetails })
 })
 
 router.post('/:id/join', requireAuth('student'), async (req, res) => {
   const seatCount = Number(req.body?.seats || 1)
-  const coPassengerName = String(req.body?.coPassengerName || '').trim()
-  const coPassengerPhone = String(req.body?.coPassengerPhone || '').trim()
-  const coPassengerInfo = String(req.body?.coPassengerInfo || '').trim()
-  if (![1, 2].includes(seatCount)) return res.status(400).json({ message: 'Choose 1 or 2 seats.' })
-  if (seatCount === 2 && (coPassengerName.length < 2 || coPassengerName.length > 80 || !GUEST_PHONE.test(coPassengerPhone) || coPassengerInfo.length > 120)) {
-    return res.status(400).json({ message: 'Enter a valid companion name and Bangladeshi mobile number. Additional information must be 120 characters or fewer.' })
-  }
+  if (seatCount !== 1) return res.status(400).json({ message: 'A joining student may reserve only their own seat.' })
 
   const ride = await mutateDb((db) => {
     const target = db.rides.find((item) => item.id === req.params.id)
@@ -345,19 +402,22 @@ router.post('/:id/join', requireAuth('student'), async (req, res) => {
       throw fail(409, 'This ride has an invalid campus route and cannot accept passengers.')
     }
     if (!isBeforeCutoff(target)) throw fail(409, 'This ride is closed. Bookings close 2 minutes before pickup.')
+    if (target.sharingMode !== 'share') throw fail(403, 'This is a private booking and cannot be joined.')
     if (studentIsOnRideGroup(db, target, req.user.id)) throw fail(409, 'You are already part of this ride.')
     const seatsUsed = totalGroupSeats(db, target)
     if (seatsUsed + seatCount > 2) throw fail(409, 'There are not enough empty seats left.')
 
     const student = db.students.find((item) => item.id === req.user.id)
     if (!student) throw fail(404, 'Student account not found.')
+    if (!canJoinRide(db, target, student)) throw fail(403, 'Your gender does not match this ride’s sharing preference, or the ride is no longer open.')
 
-    // If this student already created a matching one-seat request, pool it into
+    // If this student already created a matching one-seat share request, pool it into
     // this ride atomically instead of making them cancel manually.
     const ownRequest = db.rides.find((item) =>
       item.id !== target.id &&
       item.studentId === student.id &&
       item.status === 'pending' &&
+      item.sharingMode === 'share' &&
       sameRoute(item, target) &&
       Math.abs(pickupTime(item) - pickupTime(target)) <= MATCH_WINDOW_MS &&
       occupiedSeats(item) === 1
@@ -379,87 +439,97 @@ router.post('/:id/join', requireAuth('student'), async (req, res) => {
       studentId: student.id,
       name: student.username || student.name,
       phone: String(req.body?.phone || student.phone || ''),
-      info: 'Joined ride',
+      info: 'Joined shared ride',
       seatCount: 1,
       isGuest: false,
       joinedAt,
+      fareShare: 0,
     })
-    if (seatCount === 2) {
-      target.passengers.push({
-        studentId: 'guest-' + crypto.randomUUID(),
-        name: coPassengerName,
-        phone: coPassengerPhone,
-        info: coPassengerInfo || 'Companion passenger',
-        seatCount: 1,
-        isGuest: true,
-        joinedAt,
-      })
-    }
     recalculateRide(target)
     target.updatedAt = new Date().toISOString()
     return target
   })
 
-  res.json({ ride: studentRideView(ride), joined: true, seatsLeft: Math.max(0, 2 - occupiedSeats(ride)) })
+  res.json({ ride: studentRideView(ride, req.user.id), joined: true, seatsLeft: Math.max(0, 2 - occupiedSeats(ride)) })
 })
 
-// A passenger can cancel only before the two-minute lock. If the ride owner
-// leaves but another registered passenger remains, ownership transfers to them.
+// The creator may cancel their own participation; a joined rider may only leave their seat.
+router.patch('/:id', requireAuth('student'), async (req, res) => {
+  const { from, to, requestedTime, sharingMode, genderPreference = 'any' } = req.body || {}
+  const requestedAt = Date.parse(requestedTime)
+  if (!LOCATIONS.includes(from) || !LOCATIONS.includes(to) || from === to) throw fail(400, 'Choose two different CUET locations.')
+  if (!Number.isFinite(requestedAt) || requestedAt - Date.now() <= BOOKING_CUTOFF_MS) throw fail(400, 'Choose a pickup time more than two minutes from now.')
+  if (!['private', 'share'].includes(sharingMode) || !['any', 'male', 'female'].includes(genderPreference)) throw fail(400, 'Choose valid ride-sharing and gender preferences.')
+  const ride = await mutateDb((db) => {
+    const target = db.rides.find((item) => item.id === req.params.id)
+    if (!target || target.studentId !== req.user.id || target.ownerCancelledAt) throw fail(403, 'Only the active booking creator can edit this ride.')
+    if (target.status !== 'pending' || target.sharedGroupId || !isBeforeCutoff(target)) throw fail(409, 'This ride can no longer be edited.')
+    const passengers = normalizePassengers(target, rideOwner(db, target))
+    if (!passengers.some((passenger) => passenger.studentId === req.user.id)) throw fail(403, 'You are no longer an active passenger on this ride.')
+    const otherRiders = passengers.filter((passenger) => !passenger.isGuest && passenger.studentId !== req.user.id)
+    if (sharingMode === 'private' && otherRiders.length) throw fail(409, 'A ride with another registered passenger cannot be changed to private.')
+    if (sharingMode === 'share' && (occupiedSeats(target) !== 1 || otherRiders.length)) throw fail(409, 'Open-to-share rides must reserve only the creator’s single seat.')
+    for (const passenger of passengers.filter((item) => !item.isGuest)) {
+      if (hasStudentTimeConflict(db, passenger.studentId, requestedAt, target.id)) throw fail(409, 'A passenger already has another ride near this pickup time.')
+    }
+    target.from = from
+    target.to = to
+    target.requestedTime = new Date(requestedAt).toISOString()
+    target.sharingMode = sharingMode
+    target.genderPreference = sharingMode === 'share' ? genderPreference : 'any'
+    target.farePerSeat = farePerSeat(from, to)
+    recalculateRide(target)
+    target.updatedAt = new Date().toISOString()
+    return target
+  })
+  res.json({ ride: studentRideView(ride, req.user.id) })
+})
+
 router.post('/:id/cancel', requireAuth('student'), async (req, res) => {
   const result = await mutateDb((db) => {
     const ride = db.rides.find((item) => item.id === req.params.id)
     if (!ride || !['pending', 'accepted', 'arrived'].includes(ride.status)) throw fail(404, 'Active ride not found.')
     if (pickupTime(ride) <= Date.now()) throw fail(409, 'The pickup time has passed. Contact your driver if you cannot travel.')
-    // Cancellations remain possible after the cutoff, but the released seat is
-    // not advertised to another student once the booking window has closed.
     const seatReopened = isBeforeCutoff(ride)
-    const passengers = normalizePassengers(ride, db.students.find((item) => item.id === ride.studentId))
-    if (!passengers.some((passenger) => passenger.studentId === req.user.id)) {
-      throw fail(403, 'You are not a passenger on this ride.')
-    }
+    const passengers = normalizePassengers(ride, rideOwner(db, ride))
+    if (!passengers.some((passenger) => passenger.studentId === req.user.id)) throw fail(403, 'You are not an active passenger on this ride.')
 
-    const wasRideOwner = ride.studentId === req.user.id
-    if (wasRideOwner) {
-      // Cancel the creator's booking (including their companion), but preserve
-      // every other registered passenger already travelling on this trip.
-      ride.passengers = passengers.filter((passenger) =>
-        passenger.isGuest || passenger.studentId !== req.user.id
-      ).filter((passenger) => !passenger.isGuest)
-      if (ride.passengers.length) {
-        // The remaining registered passenger becomes the new ride owner.
-        ride.studentId = ride.passengers[0].studentId
-      }
+    const isCreator = ride.studentId === req.user.id
+    if (isCreator) {
+      if (ride.ownerCancelledAt) throw fail(403, 'The booking creator has already left this ride.')
+      ride.passengers = passengers.filter((passenger) => passenger.studentId !== req.user.id && !passenger.isGuest)
+      ride.ownerCancelledAt = new Date().toISOString()
+      ride.ownerCancelledBy = req.user.id
     } else {
       ride.passengers = passengers.filter((passenger) => passenger.studentId !== req.user.id)
     }
 
-    if (!ride.passengers.length) {
-      if (ride.status === 'pending' || !ride.driverId) {
-        // No driver has committed: remove this request from active listings.
+    const registeredRemaining = ride.passengers.filter((passenger) => !passenger.isGuest)
+    if (!registeredRemaining.length) {
+      if (ride.sharingMode !== 'share' || ride.status === 'pending' || !ride.driverId) {
         ride.status = 'cancelled'
         ride.cancelledAt = new Date().toISOString()
-        ride.cancelledBy = 'student'
+        ride.cancelledBy = isCreator ? 'creator' : 'last-passenger'
         ride.driverId = null
         delete ride.sharedGroupId
       } else {
-        // Driver already accepted: keep the trip itself alive and reopen
-        // both seats. The creator is no longer a passenger or owner.
-        ride.studentId = null
         ride.passengers = []
         ride.seats = 0
         ride.passengerCount = 0
-        ride.farePerSeat = farePerSeat(ride.from, ride.to)
-        ride.fare = 0
-        ride.ownerCancelledAt = new Date().toISOString()
-        ride.ownerCancelledBy = req.user.id
       }
-    } else {
-      recalculateRide(ride)
     }
+
     ride.updatedAt = new Date().toISOString()
-    return { ride, cancelled: true, seatReopened, tripPreserved: ['accepted', 'arrived'].includes(ride.status) && Boolean(ride.driverId) }
+    recalculateSharedGroupFares(db, ride)
+    return { ride, seatReopened, tripPreserved: ['accepted', 'arrived'].includes(ride.status) && Boolean(ride.driverId), creatorCancelled: isCreator }
   })
-  res.json({ ride: studentRideView(result.ride), cancelled: true, seatReopened: result.seatReopened, tripPreserved: result.tripPreserved })
+  res.json({
+    ride: studentRideView(result.ride, req.user.id),
+    cancelled: true,
+    seatReopened: result.seatReopened,
+    tripPreserved: result.tripPreserved,
+    creatorCancelled: result.creatorCancelled,
+  })
 })
 
 router.get('/mine', requireAuth('student'), async (req, res) => {
@@ -479,7 +549,7 @@ router.get('/mine', requireAuth('student'), async (req, res) => {
     const matches = await findMatches(ride, candidates, { useAI: false })
     return { ...ride, matchDetails: matches }
   }))
-  res.json({ rides: withMatches.map(studentRideView) })
+  res.json({ rides: withMatches.map((ride) => studentRideView(ride, req.user.id)) })
 })
 
 router.get('/pending', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
@@ -491,25 +561,26 @@ router.get('/pending', requireAuth('driver'), requireApprovedDriver, async (req,
   const groups = []
   for (const ride of pending) {
     const seats = occupiedSeats(ride)
-    const group = groups.find((candidate) => {
+    const group = ride.sharingMode === 'share' ? groups.find((candidate) => {
       if (!sameRoute(candidate, ride)) return false
       const all = candidate.rideIds.map((id) => pending.find((item) => item.id === id)).filter(Boolean)
-      return all.length < 2 &&
+      return all.length < 2 && all.every((item) => item.sharingMode === 'share') &&
+        shareRequestsCompatible(db, [...all, ride]) &&
         Math.abs(pickupTime(candidate) - pickupTime(ride)) <= MATCH_WINDOW_MS &&
         all.reduce((sum, item) => sum + occupiedSeats(item), 0) + seats <= 2
-    })
+    }) : null
 
     if (group) {
       group.rideIds.push(ride.id)
       group.riders += seats
-      group.fare += Number(ride.fare || 0)
+      group.fare = Number(ride.farePerSeat || ride.fare || 0)
       group.requestedTime = new Date(Math.min(pickupTime({ requestedTime: group.requestedTime }), pickupTime(ride))).toISOString()
     } else {
       groups.push({
         key: ride.id,
         from: ride.from,
         to: ride.to,
-        fare: Number(ride.fare || 0),
+        fare: Number(ride.farePerSeat || ride.fare || 0),
         rideIds: [ride.id],
         riders: seats,
         time: ride.createdAt,
@@ -525,7 +596,7 @@ router.post('/optimize', requireAuth('driver'), requireApprovedDriver, async (re
   if (!rideIds.length || rideIds.length > 2) throw fail(400, 'Select one shared ride group to optimize.')
   const db = await readDb()
   const selected = rideIds.map((id) => db.rides.find((ride) => ride.id === id && ride.status === 'pending')).filter(Boolean)
-  if (selected.length !== rideIds.length || !validSharedGroup(selected)) {
+  if (selected.length !== rideIds.length || !validSharedGroup(selected, db)) {
     throw fail(409, 'These requests are no longer a feasible shared ride group.')
   }
   const plan = await optimizeSharedRoute(selected)
@@ -544,7 +615,7 @@ router.post('/accept', requireAuth('driver'), requireApprovedDriver, async (req,
     if (selected.some((ride) => !ride || ride.status !== 'pending')) {
       throw fail(409, 'One or more rides are no longer available.')
     }
-    if (!validSharedGroup(selected)) {
+    if (!validSharedGroup(selected, db)) {
       throw fail(409, 'These requests cannot share one rickshaw. They must have the same route, be within 10 minutes, and use no more than two seats.')
     }
     if (selected.some((ride) => pickupTime(ride) <= Date.now())) {
@@ -568,6 +639,7 @@ router.post('/accept', requireAuth('driver'), requireApprovedDriver, async (req,
       ride.acceptedAt = new Date().toISOString()
       ride.updatedAt = ride.acceptedAt
     }
+    for (const ride of selected) recalculateSharedGroupFares(db, ride)
     return selected.length
   })
   res.json({ accepted })
