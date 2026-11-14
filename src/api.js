@@ -58,6 +58,7 @@ export const api = {
   openRides: () => request('/rides/open', { auth: true }),
   joinRide: (id, payload = {}) => request(`/rides/${id}/join`, { method: 'POST', body: payload, auth: true }),
   cancelRide: (id) => request(`/rides/${id}/cancel`, { method: 'POST', auth: true }),
+  updateRide: (id, payload) => request(`/rides/${id}`, { method: 'PATCH', body: payload, auth: true }),
   myRides: () => request('/rides/mine', { auth: true }),
   pendingGroups: () => request('/rides/pending', { auth: true }),
   optimizeRideRoute: (rideIds) => request('/rides/optimize', { method: 'POST', body: { rideIds }, auth: true }),
