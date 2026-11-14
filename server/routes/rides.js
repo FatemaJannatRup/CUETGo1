@@ -561,7 +561,7 @@ router.post('/:id/cancel', requireAuth('student'), async (req, res) => {
     const ride = db.rides.find((item) => item.id === req.params.id)
     if (!ride || !['pending', 'accepted', 'arrived'].includes(ride.status)) throw fail(404, 'Active ride not found.')
     if (pickupTime(ride) <= Date.now()) throw fail(409, 'The pickup time has passed. Contact your driver if you cannot travel.')
-    const seatReopened = isBeforeCutoff(ride)
+    let seatReopened = false
     const passengers = normalizePassengers(ride, rideOwner(db, ride))
     if (!passengers.some((passenger) => passenger.studentId === req.user.id)) throw fail(403, 'You are not an active passenger on this ride.')
 
@@ -598,13 +598,20 @@ router.post('/:id/cancel', requireAuth('student'), async (req, res) => {
       ride.fare = 0
       ride.farePaymentMode = 'none'
     }
-    return { ride, seatReopened, tripPreserved: ['accepted', 'arrived'].includes(ride.status) && Boolean(ride.driverId), creatorCancelled: isCreator }
+    const remainingSeats = totalGroupSeats(db, ride)
+    const remainingRiders = totalGroupRiders(db, ride)
+    seatReopened = ride.sharingMode === 'share' && isBeforeCutoff(ride) &&
+      ride.status !== 'cancelled' && remainingSeats < 2
+    const tripPreserved = remainingRiders > 0 ||
+      (['accepted', 'arrived'].includes(ride.status) && Boolean(ride.driverId))
+    return { ride, seatReopened, tripPreserved, driverAssigned: Boolean(ride.driverId), creatorCancelled: isCreator }
   })
   res.json({
     ride: studentRideView(result.ride, req.user.id),
     cancelled: true,
     seatReopened: result.seatReopened,
     tripPreserved: result.tripPreserved,
+    driverAssigned: result.driverAssigned,
     creatorCancelled: result.creatorCancelled,
   })
 })
