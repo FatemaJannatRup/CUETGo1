@@ -406,7 +406,9 @@ router.post('/request', requireAuth('student'), async (req, res) => {
 
 router.post('/:id/join', requireAuth('student'), async (req, res) => {
   const seatCount = Number(req.body?.seats || 1)
+  const joinerPreference = req.body?.genderPreference || 'any'
   if (seatCount !== 1) return res.status(400).json({ message: 'A joining student may reserve only their own seat.' })
+  if (!['any', 'male', 'female'].includes(joinerPreference)) return res.status(400).json({ message: 'Choose a valid gender preference.' })
 
   const ride = await mutateDb((db) => {
     const target = db.rides.find((item) => item.id === req.params.id)
@@ -425,7 +427,9 @@ router.post('/:id/join', requireAuth('student'), async (req, res) => {
 
     const student = db.students.find((item) => item.id === req.user.id)
     if (!student) throw fail(404, 'Student account not found.')
-    if (!canJoinRide(db, target, student)) throw fail(403, 'Your gender does not match this ride’s sharing preference, or the ride is no longer open.')
+    if (!canJoinRide(db, target, student) || !genderAllows(joinerPreference, rideOwner(db, target)?.gender)) {
+      throw fail(403, 'Your gender preferences are not mutually compatible with this ride.')
+    }
 
     // If this student already created a matching one-seat share request, pool it into
     // this ride atomically instead of making them cancel manually.
