@@ -173,6 +173,11 @@ function assignedRideGroup(db, target, driverId) {
 
 function validSharedGroup(rides, db) {
   if (!Array.isArray(rides) || rides.length < 1 || rides.length > 2) return false
+  if (rides.some((ride) => occupiedSeats(ride) < 1)) return false
+  if (rides.length > 1 && (
+    rides.some((ride) => occupiedSeats(ride) !== 1) ||
+    new Set(rides.map((ride) => ride.studentId)).size !== rides.length
+  )) return false
   if (!rides.every((ride) => sameRoute(ride, rides[0]))) return false
   if (rides.length > 1 && (!db || !shareRequestsCompatible(db, rides))) return false
   const times = rides.map(pickupTime)
@@ -413,6 +418,7 @@ router.post('/:id/join', requireAuth('student'), async (req, res) => {
     }
     if (!isBeforeCutoff(target)) throw fail(409, 'This ride is closed. Bookings close 2 minutes before pickup.')
     if (target.sharingMode !== 'share') throw fail(403, 'This is a private booking and cannot be joined.')
+    if (target.studentId === req.user.id) throw fail(409, 'You created this booking and cannot rejoin after leaving it.')
     if (studentIsOnRideGroup(db, target, req.user.id)) throw fail(409, 'You are already part of this ride.')
     const seatsUsed = totalGroupSeats(db, target)
     if (seatsUsed + seatCount > 2) throw fail(409, 'There are not enough empty seats left.')
