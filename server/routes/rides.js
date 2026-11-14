@@ -248,7 +248,11 @@ function studentRideView(ride, viewerId, db) {
   const mine = passengers.find((passenger) => passenger.studentId === viewerId)
   const registered = passengers.filter((passenger) => !passenger.isGuest && passenger.studentId)
   const baseFare = Number(ride.farePerSeat ?? ride.fare ?? 0)
-  const fallbackFare = ride.sharingMode === 'share' && registered.length === 2
+  const sharedGroup = db && ride.sharedGroupId ? rideGroupRecords(db, ride) : []
+  const splitAcrossRequests = sharedGroup.length === 2 &&
+    sharedGroup.reduce((sum, item) => sum + occupiedSeats(item), 0) === 2 &&
+    sharedGroup.every((item) => item.sharingMode === 'share' && occupiedSeats(item) === 1)
+  const fallbackFare = splitAcrossRequests || (ride.sharingMode === 'share' && registered.length === 2)
     ? baseFare / 2
     : mine && (mine.studentId === ride.studentId || !registered.some((passenger) => passenger.studentId === ride.studentId))
       ? baseFare : 0
