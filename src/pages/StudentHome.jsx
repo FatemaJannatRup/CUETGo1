@@ -22,6 +22,12 @@ function genderLabel(g) {
   if (g === 'unknown') return 'Prefer not to say'
   return 'Not set'
 }
+function genderAllows(preference, gender) {
+  return !['male', 'female'].includes(preference) || preference === gender
+}
+function preferenceLabel(value) {
+  return value === 'male' ? 'Male students' : value === 'female' ? 'Female students' : 'Any gender'
+}
 
 export default function StudentHome() {
   const { user, logout, updateProfile } = useAuth()
@@ -36,6 +42,9 @@ export default function StudentHome() {
   const [success, setSuccess] = useState('')
   const [cancelRideTarget, setCancelRideTarget] = useState(null)
   const [canceling, setCanceling] = useState(false)
+  const [editRideTarget, setEditRideTarget] = useState(null)
+  const [editForm, setEditForm] = useState(null)
+  const [savingEdit, setSavingEdit] = useState(false)
   const [joiningId, setJoiningId] = useState(null)
   const [editingProfile, setEditingProfile] = useState(false)
   const [profileForm, setProfileForm] = useState({ username: user?.username || user?.name || '', hall: user?.hall || '', gender: user?.gender || '' })
@@ -50,6 +59,8 @@ export default function StudentHome() {
     to: 'Academic Building',
     requestedTime: '',
     seats: 1,
+    sharingMode: 'private',
+    genderPreference: 'any',
     coPassengerName: '',
     coPassengerPhone: '',
     coPassengerInfo: '',
@@ -89,7 +100,7 @@ export default function StudentHome() {
     // Recommendations are strict whole-journey matches, not independent
     // pickup/destination matches. Only CUET location IDs from the server list
     // can be selected, and both endpoints must match in the same direction.
-    if (!form.from || !form.to || form.from === form.to || !locations.includes(form.from) || !locations.includes(form.to)) return []
+    if (form.sharingMode !== 'share' || !form.from || !form.to || form.from === form.to || !locations.includes(form.from) || !locations.includes(form.to)) return []
 
     const requestedAt = Date.parse(form.requestedTime)
     if (!Number.isFinite(requestedAt)) return []
@@ -98,8 +109,10 @@ export default function StudentHome() {
 
     return openRides
       .filter((ride) => {
+        if (ride.sharingMode !== 'share') return false
         if (ride.from !== form.from || ride.to !== form.to) return false
         if (!locations.includes(ride.from) || !locations.includes(ride.to)) return false
+        if (!genderAllows(ride.genderPreference, user?.gender) || !genderAllows(form.genderPreference, ride.hostGender)) return false
         if (!['pending', 'accepted', 'arrived'].includes(ride.status)) return false
         const rideTime = Date.parse(ride.requestedTime || ride.createdAt)
         if (!Number.isFinite(rideTime) || Math.abs(rideTime - requestedAt) > timeWindowMs) return false
@@ -114,7 +127,7 @@ export default function StudentHome() {
       }))
       .sort((a, b) => a.timeDifferenceMinutes - b.timeDifferenceMinutes)
       .slice(0, 3)
-  }, [openRides, locations, form.from, form.to, form.requestedTime, form.seats])
+  }, [openRides, locations, form.from, form.to, form.requestedTime, form.seats, form.sharingMode, form.genderPreference, user?.gender])
 
   const pendingRides = rides.filter((ride) => ride.status === 'pending')
   const acceptedRides = rides.filter((ride) => ['accepted', 'arrived', 'in_progress'].includes(ride.status))
@@ -151,7 +164,7 @@ export default function StudentHome() {
       const result = await api.requestRide(payload)
       notify('Ride booked successfully.', 'success')
       setSuccess(`Ride request created for ${payload.from} → ${payload.to}.`)
-      setForm({ ...form, from: user?.hall || '', to: 'Academic Building', requestedTime: toLocalDateTimeInput(new Date(payload.requestedTime)), seats: 1, coPassengerName: '', coPassengerPhone: '', coPassengerInfo: '' })
+      setForm({ ...form, from: user?.hall || '', to: 'Academic Building', requestedTime: toLocalDateTimeInput(new Date(payload.requestedTime)), seats: 1, sharingMode: 'private', genderPreference: 'any', coPassengerName: '', coPassengerPhone: '', coPassengerInfo: '' })
       await refreshData()
       setTab('rides')
       setTimeout(() => setSuccess(''), 3500)
@@ -217,6 +230,39 @@ export default function StudentHome() {
       setError(err.message)
     } finally {
       setCanceling(false)
+    }
+  }
+
+  const handleEditRide = (ride) => {
+    setEditRideTarget(ride)
+    setEditForm({
+      from: ride.from,
+      to: ride.to,
+      requestedTime: toLocalDateTimeInput(new Date(ride.requestedTime || ride.createdAt)),
+      sharingMode: ride.sharingMode || 'private',
+      genderPreference: ride.genderPreference || 'any',
+    })
+  }
+
+  const handleSaveRideEdit = async (event) => {
+    event.preventDefault()
+    if (!editRideTarget || !editForm) return
+    setSavingEdit(true)
+    notify('Updating your ride…', 'loading', 0)
+    try {
+      await api.updateRide(editRideTarget.id, {
+        ...editForm,
+        requestedTime: new Date(editForm.requestedTime).toISOString(),
+      })
+      setEditRideTarget(null)
+      setEditForm(null)
+      notify('Ride updated successfully.', 'success')
+      await refreshData()
+    } catch (err) {
+      notify(err.message, 'error')
+      setError(err.message)
+    } finally {
+      setSavingEdit(false)
     }
   }
 
@@ -337,6 +383,27 @@ export default function StudentHome() {
                   </div>
                 </div>
 
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-[0.14em] text-ink/60">Booking type</label>
+                  <select value={form.sharingMode} onChange={(e) => setForm({ ...form, sharingMode: e.target.value, seats: e.target.value === 'share' ? 1 : form.seats, coPassengerName: e.target.value === 'share' ? '' : form.coPassengerName, coPassengerPhone: e.target.value === 'share' ? '' : form.coPassengerPhone, coPassengerInfo: e.target.value === 'share' ? '' : form.coPassengerInfo })} className="mt-1 w-full rounded-2xl border border-sky-100 bg-sky-50 px-3 py-3 text-ink">
+                    <option value="private">Private — nobody else can join</option>
+                    <option value="share">Open to sharing — one seat for a match</option>
+                  </select>
+                  <p className="mt-1 text-xs text-ink/60">A private booking reserves the rickshaw for your party. Open-to-share reserves your seat and lets one compatible CUET student join.</p>
+                </div>
+
+                {form.sharingMode === 'share' && (
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-[0.14em] text-ink/60">Preferred co-rider gender</label>
+                    <select value={form.genderPreference} onChange={(e) => setForm({ ...form, genderPreference: e.target.value })} className="mt-1 w-full rounded-2xl border border-sky-100 bg-sky-50 px-3 py-3 text-ink">
+                      <option value="any">No preference</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                    </select>
+                    <p className="mt-1 text-xs text-ink/60">Only students whose profile gender matches this preference can join. Your own gender must also satisfy the other rider’s preference.</p>
+                  </div>
+                )}
+
                 {Number(form.seats) === 2 && (
                   <div className="rounded-2xl border border-sky-100 bg-sky-50 p-3 space-y-3">
                     <p className="text-xs font-bold uppercase tracking-[0.14em] text-ink/60">Companion details</p>
@@ -346,7 +413,7 @@ export default function StudentHome() {
                   </div>
                 )}
 
-                <p className="text-xs text-ink/60">Bookings and passenger changes close automatically 2 minutes before pickup. You can still book a ride shortly before departure.</p>
+                <p className="text-xs text-ink/60">{form.sharingMode === 'share' ? 'If a compatible student joins, the fare is split equally. If nobody joins, you pay the full fare.' : 'You are responsible for the full fare, even when booking both seats for a companion.'} Bookings and passenger changes close automatically 2 minutes before pickup.</p>
                 <button type="submit" disabled={busy} className="primary-btn w-full py-3.5 text-sm uppercase tracking-[0.16em]">
                   {busy ? 'Booking...' : 'Book ride'}
                 </button>
@@ -370,6 +437,7 @@ export default function StudentHome() {
                           <p className="font-bold text-ink">{ride.from} → {ride.to}</p>
                           <div className="ride-time-block"><span className="ride-time-date">{formatRideDate(ride.requestedTime || ride.createdAt)}</span><strong className="ride-time-clock">{formatRideClock(ride.requestedTime || ride.createdAt)}</strong></div><p className="ride-host-name">{ride.hostName}</p>
                           <p className="mt-2 text-xs text-ink/60">Exact CUET route match · {ride.timeDifferenceMinutes === 0 ? 'Same departure time' : `${ride.timeDifferenceMinutes} min from your selected time`}</p>
+                          <p className="mt-1 text-xs text-ink/60">Co-rider preference: {preferenceLabel(ride.genderPreference)}</p>
                         </div>
                         <div className="flex flex-col items-end gap-2">
                           <span className="ride-status-pill ride-status-open">{ride.seatsLeft ?? Math.max(0, 2 - Number(ride.seats || 1))} LEFT</span>
@@ -405,6 +473,7 @@ export default function StudentHome() {
                           <strong className="ride-time-clock">{formatRideClock(ride.requestedTime || ride.createdAt)}</strong>
                         </div>
                         <p className="ride-host-name">{ride.hostName}</p>
+                        <p className="mt-1 text-xs text-ink/60">Preferred co-rider: {preferenceLabel(ride.genderPreference)}</p>
                         <p className="text-[11px] text-ink/50 mt-1">{ride.status === 'arrived' ? 'Driver at pickup' : ride.status === 'accepted' ? 'Driver assigned' : ride.driverCancelledAt ? 'Finding a replacement driver' : 'Waiting for a driver'} • Booking closes 2 minutes before pickup</p>
                         <div className="mt-3 flex justify-between items-center">
                           <span className="text-xs text-ink/60">{ride.riderCount ?? 1} rider(s)</span>
@@ -439,9 +508,13 @@ export default function StudentHome() {
                         <span className="ride-seat-count">{ride.seats || 1} seat(s)</span>
                       </div>
                       <p className="text-xs text-ink/60 mt-1">Passengers: {ride.passengers?.map((item) => item.name).join(', ') || '1 rider'}</p>
+                      <p className="text-xs text-ink/60 mt-1">{ride.sharingMode === 'share' ? `Open to sharing · ${preferenceLabel(ride.genderPreference)}` : 'Private booking'} · Your fare: ৳{Number(ride.myFare ?? ride.farePerSeat ?? ride.fare ?? 0).toFixed(2)}</p>
                       {ride.driverCancelledAt && ride.status === 'pending' && <p className="text-xs text-amber-700 mt-1">Your previous driver cancelled. CUETGo is looking for a replacement driver.</p>}
                       {['pending', 'accepted', 'arrived'].includes(ride.status) && new Date(ride.requestedTime || ride.createdAt).getTime() > Date.now() && (
-                        <button onClick={() => handleCancelRide(ride)} className="secondary-btn w-full mt-3 py-2 text-xs uppercase tracking-[0.12em]">{new Date(ride.requestedTime || ride.createdAt).getTime() - Date.now() > 2 * 60 * 1000 ? 'Cancel my place' : 'Cancel (seat stays closed)'}</button>
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          {ride.canEdit && <button onClick={() => handleEditRide(ride)} className="secondary-btn py-2 text-xs uppercase tracking-[0.12em]">Edit booking</button>}
+                          <button onClick={() => handleCancelRide(ride)} className="secondary-btn py-2 text-xs uppercase tracking-[0.12em]">{ride.isCreator ? 'Cancel my ride' : 'Leave shared ride'}</button>
+                        </div>
                       )}
                     </div>
                   ))}
@@ -537,6 +610,46 @@ export default function StudentHome() {
           </div>
         )}
       </main>
+      {editRideTarget && editForm && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/55 p-5 backdrop-blur-sm" onClick={() => !savingEdit && setEditRideTarget(null)}>
+          <section role="dialog" aria-modal="true" aria-labelledby="edit-ride-title" className="w-full max-w-md rounded-3xl border border-white/70 bg-white p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <h2 id="edit-ride-title" className="text-lg font-bold">Edit your booking</h2>
+            <form onSubmit={handleSaveRideEdit} className="mt-4 space-y-3">
+              <label className="block text-xs font-bold uppercase tracking-[0.12em] text-ink/60">Pickup
+                <select required value={editForm.from} onChange={(e) => setEditForm({ ...editForm, from: e.target.value })} className="mt-1 w-full rounded-xl border border-sky-100 bg-sky-50 px-3 py-3 text-ink">
+                  {locations.map((loc) => <option key={loc} value={loc}>{loc}</option>)}
+                </select>
+              </label>
+              <label className="block text-xs font-bold uppercase tracking-[0.12em] text-ink/60">Destination
+                <select required value={editForm.to} onChange={(e) => setEditForm({ ...editForm, to: e.target.value })} className="mt-1 w-full rounded-xl border border-sky-100 bg-sky-50 px-3 py-3 text-ink">
+                  {locations.map((loc) => <option key={loc} value={loc}>{loc}</option>)}
+                </select>
+              </label>
+              <label className="block text-xs font-bold uppercase tracking-[0.12em] text-ink/60">Pickup time
+                <input required type="datetime-local" min={toLocalDateTimeInput(new Date(Date.now() + 2 * 60 * 1000 + 1000))} value={editForm.requestedTime} onChange={(e) => setEditForm({ ...editForm, requestedTime: e.target.value })} className="mt-1 w-full rounded-xl border border-sky-100 bg-sky-50 px-3 py-3 text-ink" />
+              </label>
+              <label className="block text-xs font-bold uppercase tracking-[0.12em] text-ink/60">Booking type
+                <select value={editForm.sharingMode} onChange={(e) => setEditForm({ ...editForm, sharingMode: e.target.value })} className="mt-1 w-full rounded-xl border border-sky-100 bg-sky-50 px-3 py-3 text-ink">
+                  <option value="private">Private</option>
+                  <option value="share" disabled={Number(editRideTarget.seats || 1) !== 1}>Open to sharing</option>
+                </select>
+              </label>
+              {editForm.sharingMode === 'share' && (
+                <label className="block text-xs font-bold uppercase tracking-[0.12em] text-ink/60">Preferred co-rider
+                  <select value={editForm.genderPreference} onChange={(e) => setEditForm({ ...editForm, genderPreference: e.target.value })} className="mt-1 w-full rounded-xl border border-sky-100 bg-sky-50 px-3 py-3 text-ink">
+                    <option value="any">Any gender</option><option value="male">Male</option><option value="female">Female</option>
+                  </select>
+                </label>
+              )}
+              <p className="text-xs text-ink/60">Only the original creator can edit. Editing is available before a driver accepts and before the two-minute booking cutoff.</p>
+              <div className="flex gap-2 pt-2">
+                <button type="button" disabled={savingEdit} onClick={() => setEditRideTarget(null)} className="secondary-btn flex-1 py-3 text-xs">Keep current booking</button>
+                <button type="submit" disabled={savingEdit} className="primary-btn flex-1 py-3 text-xs">{savingEdit ? 'Saving…' : 'Save changes'}</button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
       {cancelRideTarget && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-5 backdrop-blur-sm" onClick={() => !canceling && setCancelRideTarget(null)}>
           <section role="dialog" aria-modal="true" aria-labelledby="student-cancel-title" className="w-full max-w-sm rounded-3xl border border-white/70 bg-white p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
