@@ -329,6 +329,10 @@ router.get('/open', requireAuth('student'), async (req, res) => {
         hostName: activeRider(db, ride)?.username || activeRider(db, ride)?.name || host?.username || host?.name || 'Campus rider',
         sharingMode: ride.sharingMode || 'private',
         genderPreference: effectiveRidePreference(ride, db),
+        farePerSeat: Number(ride.farePerSeat || farePerSeat(ride.from, ride.to)),
+        estimatedFare: seatsUsed === 1
+          ? Number(ride.farePerSeat || farePerSeat(ride.from, ride.to)) / 2
+          : Number(ride.farePerSeat || farePerSeat(ride.from, ride.to)),
         seats: seatsUsed,
         seatsLeft: Math.max(0, 2 - seatsUsed),
         riderCount: totalGroupRiders(db, ride),
