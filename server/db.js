@@ -60,8 +60,8 @@ export async function initializeDatabase() {
       'sharingMode', COALESCE(
         data->>'sharingMode',
         CASE
-          WHEN COALESCE((SELECT COUNT(*) FROM jsonb_array_elements(COALESCE(data->'passengers', '[]'::jsonb)) AS p
-            WHERE COALESCE((p->>'isGuest')::boolean, false) = false), 0) > 1 THEN 'share'
+          WHEN COALESCE((SELECT COUNT(*) FROM jsonb_array_elements(COALESCE(data->'passengers', '[]'::jsonb)) AS passengers(passenger)
+            WHERE COALESCE((passenger->>'isGuest')::boolean, false) = false), 0) > 1 THEN 'share'
           WHEN COALESCE(NULLIF(data->>'seats','')::integer, 1) = 1 THEN 'share'
           ELSE 'private'
         END
@@ -75,9 +75,7 @@ export async function initializeDatabase() {
       ))
     )
     WHERE data->>'sharingMode' IS NULL
-       OR data->>'farePaymentMode' IS NULL
-       OR COALESCE(NULLIF(data->>'fare','')::numeric, 0) <>
-          COALESCE(NULLIF(data->>'farePerSeat','')::numeric, NULLIF(data->>'fare','')::numeric, 0);
+       OR data->>'farePaymentMode' IS NULL;
   `)
 
   // Remove only records created by the temporary demo seed. Real user data is preserved.
