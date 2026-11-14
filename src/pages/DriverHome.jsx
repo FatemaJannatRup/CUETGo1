@@ -34,13 +34,13 @@ export default function DriverHome() {
           ...ride,
           groupRideIds: [ride.id],
           passengers: [...(ride.passengers || [])],
-          seats: Number(ride.seats || 1),
+          seats: Number(ride.seats ?? 1),
           fare: Number(ride.fare || 0),
         })
       } else {
         existing.groupRideIds.push(ride.id)
         existing.passengers.push(...(ride.passengers || []))
-        existing.seats += Number(ride.seats || 1)
+        existing.seats += Number(ride.seats ?? 1)
         existing.fare += Number(ride.fare || 0)
       }
     }
