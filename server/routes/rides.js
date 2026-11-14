@@ -472,6 +472,7 @@ router.patch('/:id', requireAuth('student'), async (req, res) => {
     if (!target || target.studentId !== req.user.id || target.ownerCancelledAt) throw fail(403, 'Only the active booking creator can edit this ride.')
     if (target.status !== 'pending' || target.sharedGroupId || !isBeforeCutoff(target)) throw fail(409, 'This ride can no longer be edited.')
     const passengers = normalizePassengers(target, rideOwner(db, target))
+    target.passengers = passengers
     if (!passengers.some((passenger) => passenger.studentId === req.user.id)) throw fail(403, 'You are no longer an active passenger on this ride.')
     const otherRiders = passengers.filter((passenger) => !passenger.isGuest && passenger.studentId !== req.user.id)
     if (sharingMode === 'private' && otherRiders.length) throw fail(409, 'A ride with another registered passenger cannot be changed to private.')
