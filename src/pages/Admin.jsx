@@ -14,7 +14,14 @@ export default function Admin() {
   const notify = useFeedback()
   const forwardVerticalWheel = (event) => {
     if (Math.abs(event.deltaY) <= Math.abs(event.deltaX) || Math.abs(event.deltaY) < 1) return
-    // The horizontally scrollable data tables must not trap vertical wheel input.
+    // Admin content scrolls inside the app screen, not the document. Forward
+    // vertical wheel movement out of horizontal table wrappers to that scroller.
+    const screenScroller = event.currentTarget.closest('.phone-screen')?.querySelector('.screen-scroll')
+    if (screenScroller) {
+      screenScroller.scrollTop += event.deltaY
+      event.preventDefault()
+      return
+    }
     window.scrollBy({ top: event.deltaY, left: 0, behavior: 'auto' })
     event.preventDefault()
   }
