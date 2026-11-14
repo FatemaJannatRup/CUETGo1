@@ -282,7 +282,7 @@ router.get('/open', requireAuth('student'), async (req, res) => {
           ride.sharingMode !== 'share' ||
           pickupTime(ride) <= now + BOOKING_CUTOFF_MS ||
           !canJoinRide(db, ride, currentStudent) ||
-          !genderAllows(requestedPreference, rideOwner(db, ride)?.gender) ||
+          !genderAllows(requestedPreference, activeRider(db, ride)?.gender) ||
           studentIsOnRideGroup(db, ride, req.user.id)) return false
       const groupKey = ride.sharedGroupId || ride.id
       if (seenGroups.has(groupKey)) return false
