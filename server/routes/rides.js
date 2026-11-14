@@ -278,6 +278,7 @@ router.get('/open', requireAuth('student'), async (req, res) => {
         status: ride.status,
         driverCancelledAt: ride.driverCancelledAt || null,
         hostName: host?.username || host?.name || 'Campus rider',
+        sharingMode: ride.sharingMode || 'private',
         genderPreference: ride.genderPreference || 'any',
         seats: seatsUsed,
         seatsLeft: Math.max(0, 2 - seatsUsed),
