@@ -13,11 +13,14 @@
 - Choose a unique username during signup.
 - Maintain a profile with username, CUET hall and optional gender preference.
 - Request a ride between two different CUET campus locations for a selected pickup time.
-- Book one or two seats. A two-seat request includes the companion passenger's name and Bangladeshi phone number.
-- See shared-ride recommendations and the reason each candidate is compatible.
-- Join an available ride when there is capacity and the booking window is still open.
-- View personal rides, passenger details, status updates and ride history.
-- Cancel their own ride participation without automatically cancelling other registered passengers' plans.
+- Create a **private** booking for one or two seats, or an **open-to-share** booking for one seat.
+- Add a companion's name and Bangladeshi phone number when reserving both seats privately.
+- Set a preferred co-rider gender (any, male or female) for open-to-share bookings. Matching checks both riders' preferences against verified profile gender on the server; profile gender is not exposed in public ride listings.
+- See exact-route, time-compatible and gender-compatible shared-ride recommendations.
+- Join an open-to-share ride for one seat only; private bookings cannot be joined.
+- View personal rides, passenger details, status updates, each rider's fare responsibility and ride history.
+- Edit a pending booking only as its original creator and before the two-minute cutoff. A joined passenger can only leave their own seat.
+- Cancel their own participation without automatically cancelling another registered passenger's place.
 
 ### Drivers
 - Register and sign in using a verified personal Gmail account.
@@ -54,14 +57,15 @@ Pickup and destination must be two different locations from this list. Add or ch
 - **Recommendations:** the backend first builds a deterministic list of genuinely feasible candidates. If `GEMINI_API_KEY` is configured, Gemini can refine their ranking and explanations; otherwise the deterministic ranking is used.
 - **Stop ordering:** Gemini may suggest an order for the known pickup/drop-off points. The backend validates that every stop appears exactly once and each pickup occurs before its drop-off. A deterministic heuristic is used if Gemini is unavailable or returns an invalid result. This is not turn-by-turn navigation or live traffic routing.
 
-### Cancellation and shared-trip behavior
+### Privacy, cancellation, sharing and fares
 
-Cancellation is designed to affect only the cancelling participant where possible:
-
-- If the ride owner cancels a pending request before a driver has accepted it and no other registered passenger remains, the request is cancelled.
-- If another registered passenger remains, that passenger's trip is preserved and ride ownership is transferred to a remaining registered passenger.
-- If a driver has already accepted the trip and the original owner leaves with no other passenger remaining, the accepted trip and driver assignment are preserved. The trip can be offered to other students while it has capacity and is still before the two-minute cutoff.
-- When passengers remain, seat usage and fare totals are recalculated. The backend prevents a new join from exceeding the two-seat capacity.
+- **Private bookings** reserve the full rickshaw for the creator's party. They never appear in open listings and the join API rejects attempts to join them. A private two-seat booking may include a companion; the creator remains responsible for the full fare.
+- **Open-to-share bookings** reserve one seat for the creator and allow one compatible registered student to join. The backend enforces the two-seat limit and both riders' gender preferences.
+- Only the original creator can edit the booking. Editing is available while the request is pending, before a driver accepts it, and before the two-minute cutoff. A joined passenger can only leave their own seat.
+- If the creator leaves an open-to-share trip after another registered passenger has joined, that passenger's trip is preserved. The released seat can be offered to another compatible student while the booking window remains open. The original creator does not gain control of the remaining passenger's booking.
+- If the creator leaves a private booking, the private booking is cancelled. A private booking is never converted into a public ride automatically.
+- **Fare allocation:** a solo rider pays the full route fare. When two registered students share one rickshaw, each pays half. A creator who books both seats for a companion pays the full fare, not twice the fare. If one rider leaves, the remaining rider becomes responsible for the full fare.
+- The app displays each student's fare responsibility; it does not currently collect or process digital payments.
 - Ride mutations are performed transactionally so simultaneous joins, cancellations and acceptances are serialized by the database lock.
 
 ## Technology
@@ -204,8 +208,9 @@ All API routes are prefixed with `/api`.
 | `GET /rides/routes` | Public | Return configured campus locations and halls |
 | `GET /rides/open` | Student | List joinable campus rides |
 | `POST /rides/request` | Student | Create a ride request |
-| `POST /rides/:id/join` | Student | Join a ride with available capacity |
-| `POST /rides/:id/cancel` | Student | Cancel the student's participation |
+| `POST /rides/:id/join` | Student | Join an open-to-share ride with one seat |
+| `PATCH /rides/:id` | Student | Edit the creator's eligible pending booking |
+| `POST /rides/:id/cancel` | Student | Cancel the creator's place or leave the passenger's own seat |
 | `GET /rides/mine` | Student | List the student's rides |
 | `GET /rides/pending` | Approved driver | List compatible pending ride groups |
 | `POST /rides/optimize` | Approved driver | Suggest a shared-trip stop order |
