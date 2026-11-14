@@ -14,8 +14,9 @@ export default function Admin() {
   const notify = useFeedback()
   const forwardVerticalWheel = (event) => {
     if (Math.abs(event.deltaY) <= Math.abs(event.deltaX) || Math.abs(event.deltaY) < 1) return
-    // Admin content scrolls inside the app screen, not the document. Forward
-    // vertical wheel movement out of horizontal table wrappers to that scroller.
+    // Only take over wheel events from horizontal scrollers; normal panel text
+    // already scrolls the main screen naturally.
+    if (!event.target.closest('.admin-table-wrap, .admin-tabs')) return
     const screenScroller = event.currentTarget.closest('.phone-screen')?.querySelector('.screen-scroll')
     if (screenScroller) {
       screenScroller.scrollTop += event.deltaY
