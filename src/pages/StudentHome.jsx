@@ -28,6 +28,12 @@ function genderAllows(preference, gender) {
 function preferenceLabel(value) {
   return value === 'male' ? 'Male students' : value === 'female' ? 'Female students' : 'Any gender'
 }
+function estimateFare(from, to) {
+  if (!from || !to || from === to) return null
+  if (HALLS.includes(from) && HALLS.includes(to)) return 20
+  if (HALLS.includes(from)) return 30
+  return 25
+}
 
 export default function StudentHome() {
   const { user, logout, updateProfile } = useAuth()
@@ -414,7 +420,16 @@ export default function StudentHome() {
                   </div>
                 )}
 
-                <p className="text-xs text-ink/60">{form.sharingMode === 'share' ? 'If a compatible student joins, the fare is split equally. If nobody joins, you pay the full fare.' : 'You are responsible for the full fare, even when booking both seats for a companion.'} Bookings and passenger changes close automatically 2 minutes before pickup.</p>
+                {estimateFare(form.from, form.to) !== null && (
+                  <div className="rounded-2xl border border-sky-100 bg-sky-50 p-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-ink/60">Estimated total rickshaw fare</p>
+                    <p className="mt-1 text-xl font-bold text-sky-700">৳{estimateFare(form.from, form.to).toFixed(2)}</p>
+                    <p className="mt-1 text-xs text-ink/60">{form.sharingMode === 'share'
+                      ? `If matched, each rider pays ৳${(estimateFare(form.from, form.to) / 2).toFixed(2)}. If nobody joins, you pay the full fare.`
+                      : 'You pay the full fare. Reserving both seats for a companion does not double the fare.'}</p>
+                  </div>
+                )}
+                <p className="text-xs text-ink/60">Bookings and passenger changes close automatically 2 minutes before pickup.</p>
                 <button type="submit" disabled={busy} className="primary-btn w-full py-3.5 text-sm uppercase tracking-[0.16em]">
                   {busy ? 'Booking...' : 'Book ride'}
                 </button>
