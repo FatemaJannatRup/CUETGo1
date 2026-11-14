@@ -325,7 +325,7 @@ export default function StudentHome() {
               onClick={() => setTab(value)}
               className={`flex-1 rounded-full px-3 py-2 text-xs font-bold uppercase tracking-[0.12em] ${tab === value ? 'bg-sky-500 text-white shadow-soft' : 'bg-white text-ink/70 border border-sky-100'}`}
             >
-              {value}
+              {value === 'dashboard' ? 'Book' : value === 'rides' ? 'My rides' : 'Profile'}
             </button>
           ))}
         </nav>
@@ -338,7 +338,7 @@ export default function StudentHome() {
             <div className="app-card p-4">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-lg font-bold">Plan your trip</h2>
-                <span className="metric-pill">📅 7-day</span>
+                <span className="metric-pill">Next 7 days</span>
               </div>
 
               <div className="grid grid-cols-7 gap-2 mb-4">
@@ -393,12 +393,15 @@ export default function StudentHome() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold uppercase tracking-[0.14em] text-ink/60">Booking type</label>
-                  <select value={form.sharingMode} onChange={(e) => setForm({ ...form, sharingMode: e.target.value, seats: e.target.value === 'share' ? 1 : form.seats, coPassengerName: e.target.value === 'share' ? '' : form.coPassengerName, coPassengerPhone: e.target.value === 'share' ? '' : form.coPassengerPhone, coPassengerInfo: e.target.value === 'share' ? '' : form.coPassengerInfo })} className="mt-1 w-full rounded-2xl border border-sky-100 bg-sky-50 px-3 py-3 text-ink">
-                    <option value="private">Private — nobody else can join</option>
-                    <option value="share">Open to sharing — one seat for a match</option>
-                  </select>
-                  <p className="mt-1 text-xs text-ink/60">A private booking reserves the rickshaw for your party. Open-to-share reserves your seat and lets one compatible CUET student join.</p>
+                  <label className="mb-2 block">Ride type</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button type="button" aria-pressed={form.sharingMode === 'private'} onClick={() => setForm({ ...form, sharingMode: 'private' })} className={`ride-type-option ${form.sharingMode === 'private' ? 'ride-type-private active' : ''}`}>
+                      <span className="ride-type-icon">🔒</span><strong>Private</strong><small>Just my group</small>
+                    </button>
+                    <button type="button" aria-pressed={form.sharingMode === 'share'} onClick={() => setForm({ ...form, sharingMode: 'share', seats: 1, coPassengerName: '', coPassengerPhone: '', coPassengerInfo: '' })} className={`ride-type-option ${form.sharingMode === 'share' ? 'ride-type-share active' : ''}`}>
+                      <span className="ride-type-icon">🤝</span><strong>Share ride</strong><small>Find a co-rider</small>
+                    </button>
+                  </div>
                 </div>
 
                 {form.sharingMode === 'share' && (
@@ -409,7 +412,7 @@ export default function StudentHome() {
                       <option value="male">Male</option>
                       <option value="female">Female</option>
                     </select>
-                    <p className="mt-1 text-xs text-ink/60">Only students whose profile gender matches this preference can join. Your own gender must also satisfy the other rider’s preference.</p>
+
                   </div>
                 )}
 
@@ -426,12 +429,10 @@ export default function StudentHome() {
                   <div className="rounded-2xl border border-sky-100 bg-sky-50 p-3">
                     <p className="text-xs font-bold uppercase tracking-[0.12em] text-ink/60">Estimated total rickshaw fare</p>
                     <p className="mt-1 text-xl font-bold text-sky-700">৳{estimateFare(form.from, form.to).toFixed(2)}</p>
-                    <p className="mt-1 text-xs text-ink/60">{form.sharingMode === 'share'
-                      ? `If matched, each rider pays ৳${(estimateFare(form.from, form.to) / 2).toFixed(2)}. If nobody joins, you pay the full fare.`
-                      : 'You pay the full fare. Reserving both seats for a companion does not double the fare.'}</p>
+                    <p className="mt-1 text-xs text-ink/60">{form.sharingMode === 'share' ? `৳${(estimateFare(form.from, form.to) / 2).toFixed(2)} each when matched` : 'Full fare for your group'}</p>
                   </div>
                 )}
-                <p className="text-xs text-ink/60">Bookings and passenger changes close automatically 2 minutes before pickup.</p>
+
                 <button type="submit" disabled={busy} className="primary-btn w-full py-3.5 text-sm uppercase tracking-[0.16em]">
                   {busy ? 'Booking...' : 'Book ride'}
                 </button>
@@ -454,13 +455,13 @@ export default function StudentHome() {
                         <div>
                           <p className="font-bold text-ink">{ride.from} → {ride.to}</p>
                           <div className="ride-time-block"><span className="ride-time-date">{formatRideDate(ride.requestedTime || ride.createdAt)}</span><strong className="ride-time-clock">{formatRideClock(ride.requestedTime || ride.createdAt)}</strong></div><p className="ride-host-name">{ride.hostName}</p>
-                          <p className="mt-2 text-xs text-ink/60">Exact CUET route match · {ride.timeDifferenceMinutes === 0 ? 'Same departure time' : `${ride.timeDifferenceMinutes} min from your selected time`}</p>
-                          <p className="mt-1 text-xs text-ink/60">Co-rider preference: {preferenceLabel(ride.genderPreference)}</p>
+                          <p className="mt-2 text-xs text-ink/60">{ride.timeDifferenceMinutes === 0 ? 'Same time' : `${ride.timeDifferenceMinutes} min difference`}</p>
+                          
                           <p className="mt-1 text-xs font-semibold text-sky-700">Estimated fare if you join: ৳{Number(ride.estimatedFare ?? ride.farePerSeat ?? 0).toFixed(2)}</p>
                         </div>
                         <div className="flex flex-col items-end gap-2">
                           <span className="ride-status-pill ride-status-open">{ride.seatsLeft ?? Math.max(0, 2 - Number(ride.seats ?? 1))} LEFT</span>
-                          <button onClick={() => handleJoinRide(ride)} disabled={joiningId === ride.id || (ride.seatsLeft ?? Math.max(0, 2 - Number(ride.seats ?? 1))) < 1} className="primary-btn px-3 py-2 text-[10px] uppercase tracking-[0.10em] disabled:opacity-50">{joiningId === ride.id ? 'Joining…' : 'Join'}</button>
+                          <button onClick={() => handleJoinRide(ride)} disabled={joiningId === ride.id || (ride.seatsLeft ?? Math.max(0, 2 - Number(ride.seats ?? 1))) < 1} className="primary-btn join-ride-btn px-3 py-2 text-[10px] uppercase tracking-[0.10em] disabled:opacity-50">{joiningId === ride.id ? 'Joining…' : 'Join'}</button>
                         </div>
                       </div>
                     </div>
@@ -494,10 +495,10 @@ export default function StudentHome() {
                         <p className="ride-host-name">{ride.hostName}</p>
                         <p className="mt-1 text-xs text-ink/60">Preferred co-rider: {preferenceLabel(ride.genderPreference)}</p>
                         <p className="mt-1 text-xs font-semibold text-sky-700">Estimated fare if you join: ৳{Number(ride.estimatedFare ?? ride.farePerSeat ?? 0).toFixed(2)}</p>
-                        <p className="text-[11px] text-ink/50 mt-1">{ride.status === 'arrived' ? 'Driver at pickup' : ride.status === 'accepted' ? 'Driver assigned' : ride.driverCancelledAt ? 'Finding a replacement driver' : 'Waiting for a driver'} • Booking closes 2 minutes before pickup</p>
+                        <p className="text-[11px] text-ink/50 mt-1">{ride.status === 'arrived' ? 'Driver at pickup' : ride.status === 'accepted' ? 'Driver assigned' : ride.driverCancelledAt ? 'Finding a driver' : 'Waiting for driver'}</p>
                         <div className="mt-3 flex justify-between items-center">
                           <span className="text-xs text-ink/60">{ride.riderCount ?? 1} rider(s)</span>
-                          <button onClick={() => handleJoinRide(ride)} disabled={joiningId === ride.id || seatsLeft < 1} className="primary-btn px-4 py-2 text-xs uppercase tracking-[0.12em] disabled:opacity-50">
+                          <button onClick={() => handleJoinRide(ride)} disabled={joiningId === ride.id || seatsLeft < 1} className="primary-btn join-ride-btn px-4 py-2 text-xs uppercase tracking-[0.12em] disabled:opacity-50">
                             {joiningId === ride.id ? 'Joining...' : 'Join ride'}
                           </button>
                         </div>
@@ -528,12 +529,12 @@ export default function StudentHome() {
                         <span className="ride-seat-count">{ride.seats ?? 1} seat(s)</span>
                       </div>
                       <p className="text-xs text-ink/60 mt-1">Passengers: {ride.passengers?.map((item) => item.name).join(', ') || '1 rider'}</p>
-                      <p className="text-xs text-ink/60 mt-1">{ride.sharingMode === 'share' ? `Open to sharing · ${preferenceLabel(ride.genderPreference)}` : 'Private booking'} · Your fare: ৳{Number(ride.myFare ?? ride.farePerSeat ?? ride.fare ?? 0).toFixed(2)}</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2"><span className={`ride-type-tag ${ride.sharingMode === 'share' ? 'share' : 'private'}`}>{ride.sharingMode === 'share' ? 'Shared' : 'Private'}</span><strong className="text-sm text-sky-700">৳{Number(ride.myFare ?? ride.farePerSeat ?? ride.fare ?? 0).toFixed(2)}</strong></div>
                       {ride.driverCancelledAt && ride.status === 'pending' && <p className="text-xs text-amber-700 mt-1">Your previous driver cancelled. CUETGo is looking for a replacement driver.</p>}
                       {['pending', 'accepted', 'arrived'].includes(ride.status) && new Date(ride.requestedTime || ride.createdAt).getTime() > Date.now() && (
                         <div className="mt-3 grid grid-cols-2 gap-2">
-                          {ride.canEdit && <button onClick={() => handleEditRide(ride)} className="secondary-btn py-2 text-xs uppercase tracking-[0.12em]">Edit booking</button>}
-                          <button onClick={() => handleCancelRide(ride)} className="secondary-btn py-2 text-xs uppercase tracking-[0.12em]">{ride.isCreator ? 'Cancel my ride' : 'Leave shared ride'}</button>
+                          {ride.canEdit && <button onClick={() => handleEditRide(ride)} className="secondary-btn edit-ride-btn py-2 text-xs uppercase tracking-[0.12em]">Edit booking</button>}
+                          <button onClick={() => handleCancelRide(ride)} className="secondary-btn cancel-ride-btn py-2 text-xs uppercase tracking-[0.12em]">{ride.isCreator ? 'Cancel my ride' : 'Leave shared ride'}</button>
                         </div>
                       )}
                     </div>

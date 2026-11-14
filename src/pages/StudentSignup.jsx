@@ -7,19 +7,20 @@ import { useFeedback } from '../context/FeedbackContext.jsx'
 
 export default function StudentSignup() {
   const [username, setUsername] = useState('')
+  const [gender, setGender] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const { googleSignup } = useAuth()
   const notify = useFeedback()
   const navigate = useNavigate()
-  const valid = /^[a-zA-Z0-9_.-]{3,24}$/.test(username.trim())
+  const valid = /^[a-zA-Z0-9_.-]{3,24}$/.test(username.trim()) && ['male', 'female', 'unknown'].includes(gender)
 
   async function handleGoogle(credential) {
     if (!valid || busy) return
     setError('')
     setBusy(true)
     notify('Creating your student account…', 'loading', 0)
-    const result = await googleSignup(credential, 'student', { username: username.trim() })
+    const result = await googleSignup(credential, 'student', { username: username.trim(), gender })
     setBusy(false)
     if (!result.ok) { notify(result.message, 'error'); return setError(result.message) }
     notify('Your account is ready. Welcome to CUETGo!', 'success')
@@ -33,8 +34,10 @@ export default function StudentSignup() {
     <div className="auth-panel">
       <Field label="Choose your username"><input className={inputClass + " auth-input"} value={username} onChange={e => { setUsername(e.target.value); setError('') }} placeholder="e.g. rup_2204064" minLength={3} maxLength={24} autoComplete="username" /></Field>
       <p className="auth-hint">3–24 characters · Letters, numbers, dots, underscores and hyphens.</p>
+      <Field label="Gender"><select className={inputClass + " auth-input"} value={gender} onChange={e => { setGender(e.target.value); setError('') }} required><option value="">Select your gender</option><option value="male">Male</option><option value="female">Female</option><option value="unknown">Prefer not to say</option></select></Field>
+      <p className="auth-hint">Used only to apply ride-sharing preferences.</p>
       <div className="auth-divider"><span>THEN CONTINUE WITH</span></div>
-      {valid ? <div className="auth-google">{busy ? <p className="auth-progress">Creating your account and signing you in…</p> : <GoogleAuthButton text="signup_with" onSuccess={handleGoogle} onError={setError} />}</div> : <div className="auth-google auth-google-disabled"><span>G</span><span>Enter a valid username to continue with Google</span></div>}
+      {valid ? <div className="auth-google">{busy ? <p className="auth-progress">Creating your account and signing you in…</p> : <GoogleAuthButton text="signup_with" onSuccess={handleGoogle} onError={setError} />}</div> : <div className="auth-google auth-google-disabled"><span>G</span><span>Enter your username and gender to continue with Google</span></div>}
       {error && <p className="auth-error" role="alert">{error}</p>}
       <p className="auth-privacy">Use your official <strong>@student.cuet.ac.bd</strong> Google account. Your account is created automatically after Google verification.</p>
     </div>
