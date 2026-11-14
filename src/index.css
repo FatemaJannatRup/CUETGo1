@@ -1016,6 +1016,6 @@ body {
 .app-main { overflow-y: visible !important; }
 .screen-scroll { overscroll-behavior-y: contain; }
 
-/* Admin tables scroll horizontally, while vertical wheel movement is forwarded
-   to the document by the Admin page handler. */
+/* Admin tables scroll horizontally; the Admin page forwards vertical wheel input
+   to the app-screen scroll container. */
 .admin-table-wrap { scrollbar-gutter: stable; }
