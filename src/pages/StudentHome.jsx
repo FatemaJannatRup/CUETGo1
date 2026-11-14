@@ -461,7 +461,7 @@ export default function StudentHome() {
                         </div>
                         <div className="flex flex-col items-end gap-2">
                           <span className="ride-status-pill ride-status-open">{ride.seatsLeft ?? Math.max(0, 2 - Number(ride.seats ?? 1))} LEFT</span>
-                          <button onClick={() => handleJoinRide(ride)} disabled={joiningId === ride.id || (ride.seatsLeft ?? Math.max(0, 2 - Number(ride.seats ?? 1))) < 1} className="primary-btn px-3 py-2 text-[10px] uppercase tracking-[0.10em] disabled:opacity-50">{joiningId === ride.id ? 'Joining…' : 'Join'}</button>
+                          <button onClick={() => handleJoinRide(ride)} disabled={joiningId === ride.id || (ride.seatsLeft ?? Math.max(0, 2 - Number(ride.seats ?? 1))) < 1} className="primary-btn join-ride-btn px-3 py-2 text-[10px] uppercase tracking-[0.10em] disabled:opacity-50">{joiningId === ride.id ? 'Joining…' : 'Join'}</button>
                         </div>
                       </div>
                     </div>
@@ -498,7 +498,7 @@ export default function StudentHome() {
                         <p className="text-[11px] text-ink/50 mt-1">{ride.status === 'arrived' ? 'Driver at pickup' : ride.status === 'accepted' ? 'Driver assigned' : ride.driverCancelledAt ? 'Finding a driver' : 'Waiting for driver'}</p>
                         <div className="mt-3 flex justify-between items-center">
                           <span className="text-xs text-ink/60">{ride.riderCount ?? 1} rider(s)</span>
-                          <button onClick={() => handleJoinRide(ride)} disabled={joiningId === ride.id || seatsLeft < 1} className="primary-btn px-4 py-2 text-xs uppercase tracking-[0.12em] disabled:opacity-50">
+                          <button onClick={() => handleJoinRide(ride)} disabled={joiningId === ride.id || seatsLeft < 1} className="primary-btn join-ride-btn px-4 py-2 text-xs uppercase tracking-[0.12em] disabled:opacity-50">
                             {joiningId === ride.id ? 'Joining...' : 'Join ride'}
                           </button>
                         </div>
@@ -533,8 +533,8 @@ export default function StudentHome() {
                       {ride.driverCancelledAt && ride.status === 'pending' && <p className="text-xs text-amber-700 mt-1">Your previous driver cancelled. CUETGo is looking for a replacement driver.</p>}
                       {['pending', 'accepted', 'arrived'].includes(ride.status) && new Date(ride.requestedTime || ride.createdAt).getTime() > Date.now() && (
                         <div className="mt-3 grid grid-cols-2 gap-2">
-                          {ride.canEdit && <button onClick={() => handleEditRide(ride)} className="secondary-btn py-2 text-xs uppercase tracking-[0.12em]">Edit booking</button>}
-                          <button onClick={() => handleCancelRide(ride)} className="secondary-btn py-2 text-xs uppercase tracking-[0.12em]">{ride.isCreator ? 'Cancel my ride' : 'Leave shared ride'}</button>
+                          {ride.canEdit && <button onClick={() => handleEditRide(ride)} className="secondary-btn edit-ride-btn py-2 text-xs uppercase tracking-[0.12em]">Edit booking</button>}
+                          <button onClick={() => handleCancelRide(ride)} className="secondary-btn cancel-ride-btn py-2 text-xs uppercase tracking-[0.12em]">{ride.isCreator ? 'Cancel my ride' : 'Leave shared ride'}</button>
                         </div>
                       )}
                     </div>
