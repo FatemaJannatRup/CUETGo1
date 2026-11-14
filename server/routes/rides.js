@@ -126,7 +126,7 @@ function shareRequestsCompatible(db, rides) {
   )
 }
 function recalculateRide(ride) {
-  const passengers = Array.isArray(ride.passengers) ? ride.passengers : []
+  const passengers = Array.isArray(ride.passengers) ? ride.passengers : db ? normalizePassengers(ride, rideOwner(db, ride)) : []
   const seats = passengers.reduce((sum, passenger) => sum + passengerSeats(passenger), 0)
   const baseFare = farePerSeat(ride.from, ride.to)
   const registered = passengers.filter((passenger) => !passenger.isGuest && passenger.studentId)
@@ -145,8 +145,17 @@ function recalculateRide(ride) {
   }
 }
 function recalculateSharedGroupFares(db, ride) {
-  if (!ride.sharedGroupId) { recalculateRide(ride); return }
+  if (!ride.sharedGroupId) {
+    if (!Array.isArray(ride.passengers) && ['pending', 'accepted', 'arrived'].includes(ride.status)) {
+      ride.passengers = normalizePassengers(ride, rideOwner(db, ride))
+    }
+    recalculateRide(ride)
+    return
+  }
   const group = rideGroupRecords(db, ride)
+  for (const item of group) {
+    if (!Array.isArray(item.passengers)) item.passengers = normalizePassengers(item, rideOwner(db, item))
+  }
   const split = group.length === 2 && group.reduce((sum, item) => sum + occupiedSeats(item), 0) === 2 &&
     group.every((item) => item.sharingMode === 'share' && occupiedSeats(item) === 1)
   for (const item of group) {
@@ -226,7 +235,7 @@ function studentName(db, studentId) {
 }
 
 // Student-facing ride payloads deliberately omit passenger phone numbers.
-function studentRideView(ride, viewerId) {
+function studentRideView(ride, viewerId, db) {
   const safeRide = {}
   for (const field of [
     'id', 'from', 'to', 'fare', 'farePerSeat', 'seats', 'passengerCount',
@@ -436,7 +445,7 @@ router.post('/request', requireAuth('student'), async (req, res) => {
     } : null
   }).filter(Boolean)
 
-  res.status(201).json({ ride: studentRideView(ride, req.user.id), matches: matchDetails })
+  res.status(201).json({ ride: studentRideView(ride, req.user.id, db), matches: matchDetails })
 })
 
 router.post('/:id/join', requireAuth('student'), async (req, res) => {
@@ -616,7 +625,7 @@ router.get('/mine', requireAuth('student'), async (req, res) => {
     const matches = await findMatches(ride, candidates, { useAI: false })
     return { ...ride, matchDetails: matches }
   }))
-  res.json({ rides: withMatches.map((ride) => studentRideView(ride, req.user.id)) })
+  res.json({ rides: withMatches.map((ride) => studentRideView(ride, req.user.id, db)) })
 })
 
 router.get('/pending', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
