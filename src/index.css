@@ -1019,3 +1019,37 @@ body {
 /* Admin tables scroll horizontally; the Admin page forwards vertical wheel input
    to the app-screen scroll container. */
 .admin-table-wrap { scrollbar-gutter: stable; }
+
+/* Student booking refresh */
+.app-dashboard .ride-type-option{min-height:104px;padding:14px 10px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:5px;border:1px solid #dce8ee;border-radius:15px;background:#f8fbfc;color:#34566b;text-align:left;transition:all .18s ease}
+.app-dashboard .ride-type-option .ride-type-icon{width:30px;height:30px;display:grid;place-items:center;border-radius:10px;background:#eaf1f5;font-size:16px}
+.app-dashboard .ride-type-option strong{font-size:13px;font-weight:850}
+.app-dashboard .ride-type-option small{color:#78909f;font-size:10px}
+.app-dashboard .ride-type-option.ride-type-private.active{border-color:#3986bd;background:linear-gradient(145deg,#eaf5ff,#f5faff);color:#1e5f91;box-shadow:0 0 0 2px rgba(57,134,189,.12)}
+.app-dashboard .ride-type-option.ride-type-private.active .ride-type-icon{background:#d5eaff}
+.app-dashboard .ride-type-option.ride-type-share.active{border-color:#159b79;background:linear-gradient(145deg,#e8faf4,#f4fcf9);color:#08775c;box-shadow:0 0 0 2px rgba(21,155,121,.12)}
+.app-dashboard .ride-type-option.ride-type-share.active .ride-type-icon{background:#d0f3e7}
+.app-dashboard .primary-btn{min-height:48px;background:linear-gradient(135deg,#1888c7,#12669e)!important;color:#fff!important;font-size:12px!important;font-weight:850!important;letter-spacing:.06em!important}
+.app-dashboard .app-tabs button{font-size:11px!important;text-transform:none!important;letter-spacing:0!important}
+.app-dashboard .app-tabs button[aria-pressed="true"]{background:#176f9f!important;color:white!important;box-shadow:0 5px 13px rgba(23,111,159,.2)!important}
+.app-dashboard .ride-type-tag{padding:5px 9px;border-radius:999px;font-size:9px;font-weight:850;text-transform:uppercase;letter-spacing:.06em}
+.app-dashboard .ride-type-tag.private{color:#256b9d;background:#e8f3fc}
+.app-dashboard .ride-type-tag.share{color:#08775c;background:#e4f8f0}
+.profile-setup-page{min-height:100%;padding:34px 24px;display:flex;flex-direction:column;justify-content:center;background:radial-gradient(circle at 90% 8%,#d9f0fb 0,transparent 36%),linear-gradient(160deg,#f5fbff,#edf5f8);font-family:Inter,"Segoe UI",sans-serif}
+.profile-setup-brand{display:flex;align-items:center;gap:8px;margin-bottom:34px;color:#173d56;font-size:20px;font-weight:900;letter-spacing:-.6px}
+.profile-setup-brand span{width:34px;height:34px;display:grid;place-items:center;border-radius:11px;background:#176f9f;color:#fff}
+.profile-setup-brand b{color:#238bb8}
+.profile-setup-card{width:100%;max-width:420px;margin:0 auto;padding:26px 22px;border:1px solid #dfebf1;border-radius:23px;background:#fff;box-shadow:0 18px 45px rgba(25,76,105,.09)}
+.profile-setup-icon{width:52px;height:52px;display:grid;place-items:center;border-radius:16px;background:#e8f5fb;font-size:25px}
+.profile-setup-kicker{margin:22px 0 8px;color:#2684ae;font-size:9px;font-weight:900;letter-spacing:1.5px}
+.profile-setup-card h1{margin:0;color:#173a51;font-size:26px;line-height:1.12;letter-spacing:-.8px}
+.profile-setup-copy{margin:10px 0 22px;color:#748b9a;font-size:12px;line-height:1.55}
+.profile-gender-options{display:grid;gap:9px}
+.profile-gender-option{display:flex;align-items:center;gap:12px;min-height:50px;padding:10px 13px;border:1px solid #e1ebf0;border-radius:12px;background:#f9fcfd;color:#31546a;font-size:13px;font-weight:750;text-align:left}
+.profile-gender-option span{width:27px;height:27px;display:grid;place-items:center;border-radius:9px;background:#eaf3f8;color:#287ca4;font-size:16px}
+.profile-gender-option.selected{border-color:#2786b2;background:#edf8fd;color:#155d83;box-shadow:0 0 0 2px rgba(39,134,178,.1)}
+.profile-setup-submit{width:100%;min-height:49px;margin-top:19px;border:0;border-radius:12px;background:linear-gradient(135deg,#218bb8,#17658f);color:white;font-size:13px;font-weight:850;box-shadow:0 8px 18px rgba(25,111,151,.2)}
+.profile-setup-submit:disabled{opacity:.45}
+.profile-setup-logout{display:block;margin:15px auto 0;border:0;background:none;color:#8497a3;font-size:11px;font-weight:700}
+.profile-setup-foot{margin:20px auto 0;color:#879aa6;font-size:10px;text-align:center}
+@media(max-width:600px){.profile-setup-page{min-height:100vh;padding:28px 22px}}
