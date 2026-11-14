@@ -56,7 +56,12 @@ export async function initializeDatabase() {
   // Legacy one-seat bookings were shareable; two-seat bookings with a companion remain private.
   await pool.query(`
     UPDATE cuetgo_rides
-    SET data = data || jsonb_build_object(
+    SET fare = COALESCE(
+          NULLIF(data->>'farePerSeat','')::numeric,
+          NULLIF(data->>'fare','')::numeric,
+          0
+        ),
+        data = data || jsonb_build_object(
       'sharingMode', COALESCE(
         data->>'sharingMode',
         CASE
