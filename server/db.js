@@ -52,6 +52,34 @@ export async function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS cuetgo_rides_driver_column_idx ON cuetgo_rides (driver_id);
   `)
 
+  // Backfill the explicit ride mode and single-rickshaw fare for existing records.
+  // Legacy one-seat bookings were shareable; two-seat bookings with a companion remain private.
+  await pool.query(`
+    UPDATE cuetgo_rides
+    SET data = data || jsonb_build_object(
+      'sharingMode', COALESCE(
+        data->>'sharingMode',
+        CASE
+          WHEN COALESCE((SELECT COUNT(*) FROM jsonb_array_elements(COALESCE(data->'passengers', '[]'::jsonb)) AS p
+            WHERE COALESCE((p->>'isGuest')::boolean, false) = false), 0) > 1 THEN 'share'
+          WHEN COALESCE(NULLIF(data->>'seats','')::integer, 1) = 1 THEN 'share'
+          ELSE 'private'
+        END
+      ),
+      'genderPreference', COALESCE(data->>'genderPreference', 'any'),
+      'farePaymentMode', COALESCE(data->>'farePaymentMode', 'single-payer'),
+      'fare', to_jsonb(COALESCE(
+        NULLIF(data->>'farePerSeat','')::numeric,
+        NULLIF(data->>'fare','')::numeric,
+        0
+      ))
+    )
+    WHERE data->>'sharingMode' IS NULL
+       OR data->>'farePaymentMode' IS NULL
+       OR COALESCE(NULLIF(data->>'fare','')::numeric, 0) <>
+          COALESCE(NULLIF(data->>'farePerSeat','')::numeric, NULLIF(data->>'fare','')::numeric, 0);
+  `)
+
   // Remove only records created by the temporary demo seed. Real user data is preserved.
   const removed = await pool.query(`
     DELETE FROM cuetgo_rides WHERE id LIKE 'demo-%' OR data->>'demo' = 'true';
