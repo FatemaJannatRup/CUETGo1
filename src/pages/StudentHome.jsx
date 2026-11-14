@@ -227,7 +227,7 @@ export default function StudentHome() {
       setCancelRideTarget(null)
       notify('Your ride place was cancelled.', 'success')
       setSuccess(result.driverAssigned
-        ? 'Your place was cancelled. The accepted driver and remaining shared trip stay active.'
+        ? 'Your place was cancelled. The accepted driver remains assigned and the open shared trip is available to compatible students.'
         : result.tripPreserved
           ? 'Your place was cancelled. The remaining rider’s request stays active and the released seat can be joined.'
           : cancelRideTarget.sharingMode === 'private'
