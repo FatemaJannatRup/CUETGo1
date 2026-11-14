@@ -197,10 +197,16 @@ function studentRideView(ride, viewerId) {
   ]) if (ride[field] !== undefined) safeRide[field] = ride[field]
   const passengers = Array.isArray(ride.passengers) ? ride.passengers : []
   const mine = passengers.find((passenger) => passenger.studentId === viewerId)
+  const registered = passengers.filter((passenger) => !passenger.isGuest && passenger.studentId)
+  const baseFare = Number(ride.farePerSeat ?? ride.fare ?? 0)
+  const fallbackFare = ride.sharingMode === 'share' && registered.length === 2
+    ? baseFare / 2
+    : mine && (mine.studentId === ride.studentId || !registered.some((passenger) => passenger.studentId === ride.studentId))
+      ? baseFare : 0
   const isCreator = ride.studentId === viewerId && Boolean(mine) && !ride.ownerCancelledAt
   return {
     ...safeRide,
-    myFare: mine ? Number(mine.fareShare ?? 0) : 0,
+    myFare: mine ? Number(mine.fareShare ?? fallbackFare) : 0,
     isCreator,
     canEdit: isCreator && ride.status === 'pending' && !ride.sharedGroupId && isBeforeCutoff(ride),
     passengers: passengers.map(({ phone, nid, nidHash, studentId, ...passenger }) => passenger),
