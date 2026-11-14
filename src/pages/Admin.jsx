@@ -162,7 +162,7 @@ export default function Admin() {
     </div>
   </div>
 
-  return <div className="admin-page">
+  return <div className="admin-page" onWheel={forwardVerticalWheel}>
     <header className="admin-header">
       <div><div className="admin-brand"><span className="admin-mark-small">C</span> CUET<span>Go</span> <b>ADMIN</b></div><p>Platform control centre</p></div>
       <div className="admin-header-actions"><span>{admin.email}</span><button onClick={() => { notify('Refreshing dashboard…', 'loading', 0); loadDashboard().then(ok => { if (ok) notify('Dashboard updated.', 'success'); else notify('Could not refresh the dashboard.', 'error') }) }} disabled={loading}>↻ Refresh</button><button onClick={() => { notify('Signing out…', 'loading', 0); window.setTimeout(logout, 500) }}>Sign out</button></div>
