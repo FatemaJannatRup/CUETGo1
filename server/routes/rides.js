@@ -605,7 +605,7 @@ router.post('/:id/cancel', requireAuth('student'), async (req, res) => {
       Boolean(item.driverId) && ['accepted', 'arrived'].includes(item.status)
     )
     seatReopened = ride.sharingMode === 'share' && isBeforeCutoff(ride) &&
-      ride.status !== 'cancelled' && remainingSeats < 2
+      remainingSeats < 2 && (ride.status !== 'cancelled' || remainingRiders > 0 || driverAssigned)
     const tripPreserved = remainingRiders > 0 || driverAssigned
     return { ride, seatReopened, tripPreserved, driverAssigned, creatorCancelled: isCreator }
   })
