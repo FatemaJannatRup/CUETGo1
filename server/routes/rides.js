@@ -600,11 +600,14 @@ router.post('/:id/cancel', requireAuth('student'), async (req, res) => {
     }
     const remainingSeats = totalGroupSeats(db, ride)
     const remainingRiders = totalGroupRiders(db, ride)
+    const activeGroup = rideGroupRecords(db, ride)
+    const driverAssigned = activeGroup.some((item) =>
+      Boolean(item.driverId) && ['accepted', 'arrived'].includes(item.status)
+    )
     seatReopened = ride.sharingMode === 'share' && isBeforeCutoff(ride) &&
       ride.status !== 'cancelled' && remainingSeats < 2
-    const tripPreserved = remainingRiders > 0 ||
-      (['accepted', 'arrived'].includes(ride.status) && Boolean(ride.driverId))
-    return { ride, seatReopened, tripPreserved, driverAssigned: Boolean(ride.driverId), creatorCancelled: isCreator }
+    const tripPreserved = remainingRiders > 0 || driverAssigned
+    return { ride, seatReopened, tripPreserved, driverAssigned, creatorCancelled: isCreator }
   })
   res.json({
     ride: studentRideView(result.ride, req.user.id),
