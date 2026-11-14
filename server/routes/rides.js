@@ -518,7 +518,7 @@ router.post('/:id/cancel', requireAuth('student'), async (req, res) => {
         ride.cancelledAt = new Date().toISOString()
         ride.cancelledBy = isCreator ? 'creator' : 'last-passenger'
         ride.driverId = null
-        delete ride.sharedGroupId
+        // Keep the historical group key long enough to recalculate the remaining rider's fare.
       } else {
         ride.passengers = []
         ride.seats = 0
