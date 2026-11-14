@@ -124,7 +124,7 @@ export default function StudentHome() {
         if (!Number.isFinite(rideTime) || Math.abs(rideTime - requestedAt) > timeWindowMs) return false
         const seatsLeft = Number.isFinite(Number(ride.seatsLeft))
           ? Number(ride.seatsLeft)
-          : Math.max(0, 2 - Number(ride.seats || 1))
+          : Math.max(0, 2 - Number(ride.seats ?? 1))
         return seatsLeft >= requestedSeats
       })
       .map((ride) => ({
@@ -457,8 +457,8 @@ export default function StudentHome() {
                           <p className="mt-1 text-xs font-semibold text-sky-700">Estimated fare if you join: ৳{Number(ride.estimatedFare ?? ride.farePerSeat ?? 0).toFixed(2)}</p>
                         </div>
                         <div className="flex flex-col items-end gap-2">
-                          <span className="ride-status-pill ride-status-open">{ride.seatsLeft ?? Math.max(0, 2 - Number(ride.seats || 1))} LEFT</span>
-                          <button onClick={() => handleJoinRide(ride)} disabled={joiningId === ride.id || (ride.seatsLeft ?? Math.max(0, 2 - Number(ride.seats || 1))) < 1} className="primary-btn px-3 py-2 text-[10px] uppercase tracking-[0.10em] disabled:opacity-50">{joiningId === ride.id ? 'Joining…' : 'Join'}</button>
+                          <span className="ride-status-pill ride-status-open">{ride.seatsLeft ?? Math.max(0, 2 - Number(ride.seats ?? 1))} LEFT</span>
+                          <button onClick={() => handleJoinRide(ride)} disabled={joiningId === ride.id || (ride.seatsLeft ?? Math.max(0, 2 - Number(ride.seats ?? 1))) < 1} className="primary-btn px-3 py-2 text-[10px] uppercase tracking-[0.10em] disabled:opacity-50">{joiningId === ride.id ? 'Joining…' : 'Join'}</button>
                         </div>
                       </div>
                     </div>
@@ -478,7 +478,7 @@ export default function StudentHome() {
               ) : (
                 <div className="space-y-3">
                   {openRides.map((ride) => {
-                    const seatsLeft = Number.isFinite(Number(ride.seatsLeft)) ? Number(ride.seatsLeft) : Math.max(0, 2 - Number(ride.seats || 1))
+                    const seatsLeft = Number.isFinite(Number(ride.seatsLeft)) ? Number(ride.seatsLeft) : Math.max(0, 2 - Number(ride.seats ?? 1))
                     return (
                       <div key={ride.id} className="rounded-2xl border border-sky-100 bg-white p-3 shadow-sm">
                         <div className="ride-card-heading">
@@ -523,7 +523,7 @@ export default function StudentHome() {
                           <span className="ride-time-date">{formatRideDate(ride.requestedTime || ride.createdAt)}</span>
                           <strong className="ride-time-clock">{formatRideClock(ride.requestedTime || ride.createdAt)}</strong>
                         </div>
-                        <span className="ride-seat-count">{ride.seats || 1} seat(s)</span>
+                        <span className="ride-seat-count">{ride.seats ?? 1} seat(s)</span>
                       </div>
                       <p className="text-xs text-ink/60 mt-1">Passengers: {ride.passengers?.map((item) => item.name).join(', ') || '1 rider'}</p>
                       <p className="text-xs text-ink/60 mt-1">{ride.sharingMode === 'share' ? `Open to sharing · ${preferenceLabel(ride.genderPreference)}` : 'Private booking'} · Your fare: ৳{Number(ride.myFare ?? ride.farePerSeat ?? ride.fare ?? 0).toFixed(2)}</p>
