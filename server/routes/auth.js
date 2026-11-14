@@ -85,6 +85,8 @@ router.post('/google/signup', async (req, res) => {
         const match = google.email.match(CUET_EMAIL)
         if (!match) throw authFail(403, 'Students must use their verified CUET student Google account.')
         const username = String(profile.username || '').trim()
+        const gender = String(profile.gender || '').trim()
+        if (!['male', 'female', 'unknown'].includes(gender)) throw authFail(400, 'Select your gender to create a student account.')
         if (username.length < 3 || username.length > 24 || !/^[a-zA-Z0-9_.-]+$/.test(username)) {
           throw authFail(400, 'Username must be 3–24 characters and contain only letters, numbers, dots, underscores or hyphens.')
         }
@@ -100,6 +102,7 @@ router.post('/google/signup', async (req, res) => {
           name: username,
           email: google.email,
           studentId: match[1].slice(1),
+          gender,
           googleId: google.googleId,
           authProvider: 'google',
           createdAt: new Date().toISOString(),
