@@ -103,8 +103,8 @@ function recalculateRide(ride) {
   ride.seats = seats
   ride.passengerCount = seats
   ride.farePerSeat = baseFare
-  ride.fare = baseFare
-  ride.farePaymentMode = split ? 'split' : 'single-payer'
+  ride.fare = registered.length ? baseFare : 0
+  ride.farePaymentMode = split ? 'split' : registered.length ? 'single-payer' : 'none'
   for (const passenger of passengers) {
     passenger.fareShare = split && !passenger.isGuest ? baseFare / 2
       : passenger.studentId === payerId ? baseFare : 0
@@ -521,6 +521,8 @@ router.post('/:id/cancel', requireAuth('student'), async (req, res) => {
         ride.cancelledAt = new Date().toISOString()
         ride.cancelledBy = isCreator ? 'creator' : 'last-passenger'
         ride.driverId = null
+        ride.seats = 0
+        ride.passengerCount = 0
         // Keep the historical group key long enough to recalculate the remaining rider's fare.
       } else {
         ride.passengers = []
@@ -531,6 +533,10 @@ router.post('/:id/cancel', requireAuth('student'), async (req, res) => {
 
     ride.updatedAt = new Date().toISOString()
     recalculateSharedGroupFares(db, ride)
+    if (ride.status === 'cancelled') {
+      ride.fare = 0
+      ride.farePaymentMode = 'none'
+    }
     return { ride, seatReopened, tripPreserved: ['accepted', 'arrived'].includes(ride.status) && Boolean(ride.driverId), creatorCancelled: isCreator }
   })
   res.json({
@@ -568,7 +574,7 @@ router.get('/mine', requireAuth('student'), async (req, res) => {
 router.get('/pending', requireAuth('driver'), requireApprovedDriver, async (req, res) => {
   const db = await readDbAndExpirePending()
   const pending = db.rides
-    .filter((ride) => ride.status === 'pending' && pickupTime(ride) > Date.now())
+    .filter((ride) => ride.status === 'pending' && pickupTime(ride) > Date.now() && occupiedSeats(ride) > 0)
     .sort((a, b) => pickupTime(a) - pickupTime(b))
 
   const groups = []
