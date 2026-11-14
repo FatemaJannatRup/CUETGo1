@@ -454,6 +454,7 @@ export default function StudentHome() {
                           <div className="ride-time-block"><span className="ride-time-date">{formatRideDate(ride.requestedTime || ride.createdAt)}</span><strong className="ride-time-clock">{formatRideClock(ride.requestedTime || ride.createdAt)}</strong></div><p className="ride-host-name">{ride.hostName}</p>
                           <p className="mt-2 text-xs text-ink/60">Exact CUET route match · {ride.timeDifferenceMinutes === 0 ? 'Same departure time' : `${ride.timeDifferenceMinutes} min from your selected time`}</p>
                           <p className="mt-1 text-xs text-ink/60">Co-rider preference: {preferenceLabel(ride.genderPreference)}</p>
+                          <p className="mt-1 text-xs font-semibold text-sky-700">Estimated fare if you join: ৳{Number(ride.estimatedFare ?? ride.farePerSeat ?? 0).toFixed(2)}</p>
                         </div>
                         <div className="flex flex-col items-end gap-2">
                           <span className="ride-status-pill ride-status-open">{ride.seatsLeft ?? Math.max(0, 2 - Number(ride.seats || 1))} LEFT</span>
@@ -490,6 +491,7 @@ export default function StudentHome() {
                         </div>
                         <p className="ride-host-name">{ride.hostName}</p>
                         <p className="mt-1 text-xs text-ink/60">Preferred co-rider: {preferenceLabel(ride.genderPreference)}</p>
+                        <p className="mt-1 text-xs font-semibold text-sky-700">Estimated fare if you join: ৳{Number(ride.estimatedFare ?? ride.farePerSeat ?? 0).toFixed(2)}</p>
                         <p className="text-[11px] text-ink/50 mt-1">{ride.status === 'arrived' ? 'Driver at pickup' : ride.status === 'accepted' ? 'Driver assigned' : ride.driverCancelledAt ? 'Finding a replacement driver' : 'Waiting for a driver'} • Booking closes 2 minutes before pickup</p>
                         <div className="mt-3 flex justify-between items-center">
                           <span className="text-xs text-ink/60">{ride.riderCount ?? 1} rider(s)</span>
