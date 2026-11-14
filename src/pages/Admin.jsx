@@ -12,6 +12,12 @@ function Stat({ label, value, hint }) {
 
 export default function Admin() {
   const notify = useFeedback()
+  const forwardVerticalWheel = (event) => {
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX) || Math.abs(event.deltaY) < 1) return
+    // The horizontally scrollable data tables must not trap vertical wheel input.
+    window.scrollBy({ top: event.deltaY, left: 0, behavior: 'auto' })
+    event.preventDefault()
+  }
   const [admin, setAdmin] = useState(null)
   const [checking, setChecking] = useState(true)
   const [email, setEmail] = useState('')
@@ -135,9 +141,9 @@ export default function Admin() {
     }
   }
 
-  if (checking) return <div className="admin-page"><div className="admin-loading">Checking administrator session…</div></div>
+  if (checking) return <div className="admin-page" onWheel={forwardVerticalWheel}><div className="admin-loading">Checking administrator session…</div></div>
 
-  if (!admin) return <div className="admin-page admin-login-page">
+  if (!admin) return <div className="admin-page admin-login-page" onWheel={forwardVerticalWheel}>
     <Link className="admin-back" to="/">← Back to CUETGo</Link>
     <div className="admin-login-card">
       <div className="admin-mark">C</div>
