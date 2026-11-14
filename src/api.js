@@ -55,7 +55,7 @@ export const api = {
   updateProfile: (payload) => request('/auth/profile', { method: 'PUT', body: payload, auth: true }),
   routes: () => request('/rides/routes'),
   requestRide: (payload) => request('/rides/request', { method: 'POST', body: payload, auth: true }),
-  openRides: () => request('/rides/open', { auth: true }),
+  openRides: (genderPreference = 'any') => request(`/rides/open?genderPreference=${encodeURIComponent(genderPreference)}`, { auth: true }),
   joinRide: (id, payload = {}) => request(`/rides/${id}/join`, { method: 'POST', body: payload, auth: true }),
   cancelRide: (id) => request(`/rides/${id}/cancel`, { method: 'POST', auth: true }),
   updateRide: (id, payload) => request(`/rides/${id}`, { method: 'PATCH', body: payload, auth: true }),
